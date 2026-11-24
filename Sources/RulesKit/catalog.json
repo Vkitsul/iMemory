@@ -1,0 +1,170 @@
+{
+  "version": 2,
+  "rules": [
+    {
+      "id": "homebrew.cache",
+      "title": "Cache di Homebrew",
+      "explanation": "Pacchetti già scaricati. Homebrew li riscarica se servono.",
+      "level": "safe",
+      "roots": [
+        "~/Library/Caches/Homebrew"
+      ],
+      "ownerProcesses": [],
+      "section": "developer"
+    },
+    {
+      "id": "pip.cache",
+      "title": "Cache di pip",
+      "explanation": "Pacchetti Python già scaricati. pip li riscarica se servono.",
+      "level": "safe",
+      "roots": [
+        "~/Library/Caches/pip"
+      ],
+      "ownerProcesses": [],
+      "section": "developer"
+    },
+    {
+      "id": "npm.cache",
+      "title": "Cache di npm",
+      "explanation": "Pacchetti JavaScript già scaricati. npm li riscarica se servono.",
+      "level": "safe",
+      "roots": [
+        "~/.npm/_cacache"
+      ],
+      "ownerProcesses": [],
+      "section": "developer"
+    },
+    {
+      "id": "logs.old",
+      "title": "Log vecchi",
+      "explanation": "File di log delle app non modificati da oltre 30 giorni. Servono solo per diagnosticare problemi passati.",
+      "level": "safe",
+      "roots": [
+        "~/Library/Logs"
+      ],
+      "ownerProcesses": [],
+      "minimumAgeDays": 30
+    },
+    {
+      "id": "brave.cache",
+      "title": "Cache di Brave",
+      "explanation": "Pagine e immagini salvate per aprire i siti più in fretta. Si ricrea navigando, e i primi caricamenti saranno più lenti. Non tocca cronologia, password e cookie.",
+      "level": "review",
+      "roots": [
+        "~/Library/Caches/BraveSoftware",
+        "~/Library/Caches/com.brave.Browser"
+      ],
+      "ownerProcesses": [
+        "Brave Browser"
+      ]
+    },
+    {
+      "id": "chrome.cache",
+      "title": "Cache di Chrome",
+      "explanation": "Pagine e immagini salvate per aprire i siti più in fretta. Si ricrea navigando, e i primi caricamenti saranno più lenti. Non tocca cronologia, password e cookie.",
+      "level": "review",
+      "roots": [
+        "~/Library/Caches/Google/Chrome"
+      ],
+      "ownerProcesses": [
+        "Google Chrome"
+      ]
+    },
+    {
+      "id": "steam.cache",
+      "title": "Cache di Steam",
+      "explanation": "File temporanei del programma Steam. Non contiene i giochi né i salvataggi. Si ricrea alla prossima apertura.",
+      "level": "review",
+      "roots": [
+        "~/Library/Caches/Steam"
+      ],
+      "ownerProcesses": [
+        "steam_osx"
+      ]
+    },
+    {
+      "id": "xcode.deriveddata",
+      "title": "Dati di compilazione di Xcode",
+      "explanation": "La cartella DerivedData. Xcode la ricrea, ma la prossima compilazione di ogni progetto sarà completa e più lenta.",
+      "level": "review",
+      "section": "developer",
+      "roots": [
+        "~/Library/Developer/Xcode/DerivedData"
+      ],
+      "ownerProcesses": [
+        "Xcode"
+      ]
+    },
+    {
+      "id": "xcode.devicesupport",
+      "title": "Supporto dispositivi iOS",
+      "explanation": "File di debug scaricati da iPhone e iPad collegati. Xcode li riscarica al prossimo collegamento, e può volerci qualche minuto.",
+      "level": "review",
+      "section": "developer",
+      "roots": [
+        "~/Library/Developer/Xcode/iOS DeviceSupport"
+      ],
+      "ownerProcesses": [
+        "Xcode"
+      ]
+    },
+    {
+      "id": "simulators.unavailable",
+      "title": "Simulatori non disponibili",
+      "explanation": "Simulatori di versioni di iOS non più installate: non si possono avviare.",
+      "level": "safe",
+      "section": "developer",
+      "roots": [
+        "~/Library/Developer/CoreSimulator/Devices"
+      ],
+      "ownerProcesses": [],
+      "command": {
+        "executable": "/usr/bin/xcrun",
+        "arguments": [
+          "simctl",
+          "delete",
+          "unavailable"
+        ]
+      }
+    },
+    {
+      "id": "simulators.eraseall",
+      "title": "Dati di tutti i simulatori",
+      "explanation": "Riporta ogni simulatore allo stato iniziale: si perdono le app installate e i loro dati, le foto e le impostazioni. I simulatori restano, e occupano ancora qualche MB ciascuno.",
+      "level": "review",
+      "section": "developer",
+      "roots": [
+        "~/Library/Developer/CoreSimulator/Devices"
+      ],
+      "ownerProcesses": [
+        "Simulator"
+      ],
+      "command": {
+        "executable": "/usr/bin/xcrun",
+        "arguments": [
+          "simctl",
+          "erase",
+          "all"
+        ]
+      }
+    },
+    {
+      "id": "homebrew.oldversions",
+      "title": "Versioni vecchie di Homebrew",
+      "explanation": "Versioni superate dei pacchetti installati. Elimina anche la cache di Homebrew.",
+      "level": "review",
+      "section": "developer",
+      "roots": [
+        "~/Library/Caches/Homebrew"
+      ],
+      "ownerProcesses": [],
+      "command": {
+        "executable": "/opt/homebrew/bin/brew",
+        "arguments": [
+          "cleanup",
+          "--prune=all"
+        ]
+      }
+    }
+  ]
+}

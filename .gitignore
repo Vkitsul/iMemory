@@ -1,0 +1,7 @@
+# Artefatti di compilazione
+.build/
+build/
+.swiftpm/
+
+# macOS
+.DS_Store
