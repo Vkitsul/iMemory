@@ -110,22 +110,22 @@ struct DuplicatesView: View {
             switch model.phase {
             case .idle:
                 ContentUnavailableView {
-                    Label("Cerca i file duplicati", systemImage: "doc.on.doc")
+                    Label("Find duplicate files", systemImage: "doc.on.doc")
                 } description: {
-                    Text("Confronta il contenuto dei file oltre 1 MB nella tua cartella, fuori dalla Libreria e dalle cartelle nascoste. I cloni APFS non contano: non occupano spazio doppio. Legge soltanto.")
+                    Text("Compares the content of files over 1 MB in your home folder, outside the Library and hidden folders. APFS clones don't count: they don't take up space twice. Only reads.")
                 } actions: {
-                    Button("Cerca") { model.search(tree: tree, homeInTree: homeInTree) }
+                    Button("Search") { model.search(tree: tree, homeInTree: homeInTree) }
                 }
             case .searching(let progress):
                 VStack(spacing: 14) {
                     ProgressView()
                         .controlSize(.large)
-                    Text("Confronto dei file")
+                    Text("Comparing files")
                         .font(.title3)
-                    Text("\(Format.count(progress.filesRead)) di \(Format.count(progress.filesToRead)) file, \(Format.bytes(progress.bytesRead)) letti")
+                    Text("\(Format.count(progress.filesRead)) of \(Format.count(progress.filesToRead)) files, \(Format.bytes(progress.bytesRead)) read")
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
-                    Button("Interrompi") { model.stopSearch() }
+                    Button("Stop") { model.stopSearch() }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .finished(let result):
@@ -142,13 +142,13 @@ struct DuplicatesView: View {
     private func results(_ result: DuplicateSearchResult) -> some View {
         if result.groups.isEmpty {
             ContentUnavailableView {
-                Label(result.wasCancelled ? "Ricerca interrotta" : "Nessun duplicato", systemImage: "checkmark.circle")
+                Label(result.wasCancelled ? "Search stopped" : "No duplicates", systemImage: "checkmark.circle")
             } description: {
                 Text(result.wasCancelled
-                    ? "La ricerca è stata interrotta prima di trovare duplicati."
-                    : "Fra \(Format.count(result.filesConsidered)) file oltre 1 MB non ci sono copie che occupano spazio doppio.")
+                    ? "The search was stopped before finding any duplicates."
+                    : "Among \(Format.count(result.filesConsidered)) files over 1 MB, no copies take up space twice.")
             } actions: {
-                Button("Cerca di nuovo") { model.search(tree: tree, homeInTree: homeInTree) }
+                Button("Search again") { model.search(tree: tree, homeInTree: homeInTree) }
             }
         } else {
             VStack(spacing: 0) {
@@ -158,7 +158,7 @@ struct DuplicatesView: View {
                             DuplicateRow(file: file, group: group, model: model)
                         }
                     } header: {
-                        Text("\(group.copies) copie: si recuperano \(Format.bytes(group.reclaimable))")
+                        Text("\(group.copies) copies: \(Format.bytes(group.reclaimable)) to recover")
                             .textCase(nil)
                     }
                 }
@@ -174,24 +174,24 @@ struct DuplicatesView: View {
 
         return HStack {
             VStack(alignment: .leading, spacing: 1) {
-                Text(count == 0 ? "Nessun file selezionato" : "\(Format.items(count)) da spostare")
+                Text(count == 0 ? "No files selected" : "\(Format.items(count)) to move")
                     .fontWeight(count == 0 ? .regular : .medium)
                 if result.wasCancelled {
-                    Text("Ricerca interrotta: i risultati sono parziali.")
+                    Text("Search stopped: the results are partial.")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 } else if result.unreadableFiles > 0 {
-                    Text("\(Format.count(result.unreadableFiles)) file non leggibili sono esclusi.")
+                    Text("\(Format.count(result.unreadableFiles)) unreadable files are left out.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Scegli le copie da togliere. Almeno una resta sempre.")
+                    Text("Choose the copies to remove. At least one always stays.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
-            Button("Sposta nel Cestino…") {
+            Button("Move to Trash…") {
                 if let selection {
                     trash.prepareDuplicates(selection)
                 }
@@ -210,7 +210,7 @@ private struct DuplicateRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Toggle("Seleziona \(URL(fileURLWithPath: file.path).lastPathComponent)", isOn: Binding(
+            Toggle("Select \(URL(fileURLWithPath: file.path).lastPathComponent)", isOn: Binding(
                 get: { model.selected.contains(file.id) },
                 set: { isOn in
                     if isOn {
@@ -234,7 +234,7 @@ private struct DuplicateRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 if file.isClone {
-                    Text("Clone: condivide spazio con un'altra voce del gruppo")
+                    Text("Clone: shares space with another item in the group")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -247,7 +247,7 @@ private struct DuplicateRow: View {
                 .frame(minWidth: 72, alignment: .trailing)
         }
         .contextMenu {
-            Button("Mostra nel Finder") {
+            Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file.path)])
             }
         }

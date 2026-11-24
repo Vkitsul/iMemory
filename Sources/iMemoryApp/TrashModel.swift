@@ -68,7 +68,7 @@ final class TrashModel {
 
     func prepareFiles(_ files: [LargeFile]) {
         phase = .confirming(Request(
-            title: "File grandi",
+            title: "Large files",
             items: files.map { TrashItem(path: $0.path, fileID: $0.fileID, allocated: $0.allocated, kind: .file) },
             executable: nil,
             note: nil
@@ -80,10 +80,10 @@ final class TrashModel {
             TrashItem(path: file.path, fileID: file.fileID, allocated: file.allocated, kind: .file)
         }
         phase = .confirming(Request(
-            title: "Duplicati",
+            title: "Duplicates",
             items: selection.toRemove.map(item),
             executable: nil,
-            note: "Resta una copia per gruppo. Se manca al momento di spostare, non si sposta nulla.",
+            note: "One copy per group stays. If it's missing when moving, nothing moves.",
             mustRemain: selection.toKeep.map(item)
         ))
     }

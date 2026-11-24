@@ -31,9 +31,9 @@ struct OverviewView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("\(Format.bytes(breakdown.free)) liberi")
+            Text("\(Format.bytes(breakdown.free)) free")
                 .font(.largeTitle.weight(.medium))
-            Text("su \(Format.bytes(breakdown.total))")
+            Text("of \(Format.bytes(breakdown.total))")
                 .foregroundStyle(.secondary)
         }
     }
@@ -43,13 +43,13 @@ struct OverviewView: View {
             Image(systemName: "lock")
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(Format.count(session.unreadableInHome)) cartelle della tua Home non sono leggibili")
+                Text("\(Format.count(session.unreadableInHome)) folders in your home can't be read")
                     .fontWeight(.medium)
-                Text("Foto, backup e dati di alcune app restano fuori dai totali finché iMemory non ha l'Accesso completo al disco.")
+                Text("Photos, backups, and some app data stay out of the totals until iMemory has Full Disk Access.")
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Apri Impostazioni") {
+            Button("Open Settings") {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles") {
                     NSWorkspace.shared.open(url)
                 }
@@ -64,7 +64,7 @@ struct OverviewView: View {
         let top = session.candidates.prefix(3)
         if !top.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Azioni consigliate")
+                Text("Suggested actions")
                     .font(.headline)
                 VStack(spacing: 0) {
                     ForEach(top) { candidate in
@@ -106,7 +106,7 @@ struct OverviewView: View {
     private var growth: some View {
         if let grown = session.growth, !grown.isEmpty, let date = session.previousScanDate {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Cosa è cresciuto dal \(Format.dateTime(date))")
+                Text("What grew since \(Format.dateTime(date))")
                     .font(.headline)
                 VStack(spacing: 0) {
                     ForEach(grown) { item in
@@ -142,7 +142,7 @@ struct OverviewView: View {
 
     private var categories: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Spazio occupato")
+            Text("Used space")
                 .font(.headline)
             VStack(spacing: 0) {
                 ForEach(breakdown.entries) { entry in
@@ -158,7 +158,7 @@ struct OverviewView: View {
 
     private var largestFolders: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Cartelle più grandi")
+            Text("Largest folders")
                 .font(.headline)
             VStack(spacing: 0) {
                 ForEach(session.largestFolders, id: \.self) { node in
@@ -189,7 +189,7 @@ struct OverviewView: View {
     }
 
     private var footer: some View {
-        Text("\(Format.count(session.tree.count)) voci in \(Format.seconds(session.duration))")
+        Text("\(Format.count(session.tree.count)) items in \(Format.seconds(session.duration))")
             .font(.caption)
             .foregroundStyle(.secondary)
     }
@@ -209,13 +209,13 @@ private struct StorageBar: View {
                 }
                 Rectangle()
                     .fill(.quaternary)
-                    .help("Libero: \(Format.bytes(breakdown.free))")
+                    .help("Free: \(Format.bytes(breakdown.free))")
             }
         }
         .frame(height: 18)
         .clipShape(.rect(cornerRadius: 5))
         .accessibilityElement()
-        .accessibilityLabel("Spazio su disco: \(Format.bytes(breakdown.free)) liberi su \(Format.bytes(breakdown.total))")
+        .accessibilityLabel("Disk space: \(Format.bytes(breakdown.free)) free of \(Format.bytes(breakdown.total))")
     }
 
     private func width(of bytes: Int64, in available: CGFloat) -> CGFloat {
@@ -270,7 +270,7 @@ private struct LevelBadge: View {
     let level: RiskLevel
 
     var body: some View {
-        Text(level == .safe ? "Sicuro" : "Da valutare")
+        Text(level == .safe ? "Safe" : "Review first")
             .font(.caption)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)

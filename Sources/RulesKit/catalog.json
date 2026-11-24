@@ -3,8 +3,8 @@
   "rules": [
     {
       "id": "homebrew.cache",
-      "title": "Cache di Homebrew",
-      "explanation": "Pacchetti già scaricati. Homebrew li riscarica se servono.",
+      "title": "Homebrew cache",
+      "explanation": "Packages already downloaded. Homebrew downloads them again when needed.",
       "level": "safe",
       "roots": [
         "~/Library/Caches/Homebrew"
@@ -14,8 +14,8 @@
     },
     {
       "id": "pip.cache",
-      "title": "Cache di pip",
-      "explanation": "Pacchetti Python già scaricati. pip li riscarica se servono.",
+      "title": "pip cache",
+      "explanation": "Python packages already downloaded. pip downloads them again when needed.",
       "level": "safe",
       "roots": [
         "~/Library/Caches/pip"
@@ -25,8 +25,8 @@
     },
     {
       "id": "npm.cache",
-      "title": "Cache di npm",
-      "explanation": "Pacchetti JavaScript già scaricati. npm li riscarica se servono.",
+      "title": "npm cache",
+      "explanation": "JavaScript packages already downloaded. npm downloads them again when needed.",
       "level": "safe",
       "roots": [
         "~/.npm/_cacache"
@@ -36,8 +36,8 @@
     },
     {
       "id": "logs.old",
-      "title": "Log vecchi",
-      "explanation": "File di log delle app non modificati da oltre 30 giorni. Servono solo per diagnosticare problemi passati.",
+      "title": "Old logs",
+      "explanation": "App log files untouched for over 30 days. They only help diagnose past problems.",
       "level": "safe",
       "roots": [
         "~/Library/Logs"
@@ -47,8 +47,8 @@
     },
     {
       "id": "brave.cache",
-      "title": "Cache di Brave",
-      "explanation": "Pagine e immagini salvate per aprire i siti più in fretta. Si ricrea navigando, e i primi caricamenti saranno più lenti. Non tocca cronologia, password e cookie.",
+      "title": "Brave cache",
+      "explanation": "Pages and images saved to open sites faster. It's recreated as you browse, and the first page loads will be slower. Doesn't touch history, passwords, or cookies.",
       "level": "review",
       "roots": [
         "~/Library/Caches/BraveSoftware",
@@ -60,8 +60,8 @@
     },
     {
       "id": "chrome.cache",
-      "title": "Cache di Chrome",
-      "explanation": "Pagine e immagini salvate per aprire i siti più in fretta. Si ricrea navigando, e i primi caricamenti saranno più lenti. Non tocca cronologia, password e cookie.",
+      "title": "Chrome cache",
+      "explanation": "Pages and images saved to open sites faster. It's recreated as you browse, and the first page loads will be slower. Doesn't touch history, passwords, or cookies.",
       "level": "review",
       "roots": [
         "~/Library/Caches/Google/Chrome"
@@ -72,8 +72,8 @@
     },
     {
       "id": "steam.cache",
-      "title": "Cache di Steam",
-      "explanation": "File temporanei del programma Steam. Non contiene i giochi né i salvataggi. Si ricrea alla prossima apertura.",
+      "title": "Steam cache",
+      "explanation": "Temporary files of the Steam app. Doesn't contain games or saves. Recreated the next time it opens.",
       "level": "review",
       "roots": [
         "~/Library/Caches/Steam"
@@ -84,8 +84,8 @@
     },
     {
       "id": "xcode.deriveddata",
-      "title": "Dati di compilazione di Xcode",
-      "explanation": "La cartella DerivedData. Xcode la ricrea, ma la prossima compilazione di ogni progetto sarà completa e più lenta.",
+      "title": "Xcode build data",
+      "explanation": "The DerivedData folder. Xcode recreates it, but the next build of every project will be a full, slower one.",
       "level": "review",
       "section": "developer",
       "roots": [
@@ -97,8 +97,8 @@
     },
     {
       "id": "xcode.devicesupport",
-      "title": "Supporto dispositivi iOS",
-      "explanation": "File di debug scaricati da iPhone e iPad collegati. Xcode li riscarica al prossimo collegamento, e può volerci qualche minuto.",
+      "title": "iOS device support",
+      "explanation": "Debug files downloaded from connected iPhones and iPads. Xcode downloads them again the next time one connects, which can take a few minutes.",
       "level": "review",
       "section": "developer",
       "roots": [
@@ -110,8 +110,8 @@
     },
     {
       "id": "simulators.unavailable",
-      "title": "Simulatori non disponibili",
-      "explanation": "Simulatori di versioni di iOS non più installate: non si possono avviare.",
+      "title": "Unavailable simulators",
+      "explanation": "Simulators for iOS versions that are no longer installed: they can't start.",
       "level": "safe",
       "section": "developer",
       "roots": [
@@ -129,8 +129,8 @@
     },
     {
       "id": "simulators.eraseall",
-      "title": "Dati di tutti i simulatori",
-      "explanation": "Riporta ogni simulatore allo stato iniziale: si perdono le app installate e i loro dati, le foto e le impostazioni. I simulatori restano, e occupano ancora qualche MB ciascuno.",
+      "title": "Data of all simulators",
+      "explanation": "Resets every simulator to its initial state: installed apps and their data, photos, and settings are lost. The simulators stay, and still take a few MB each.",
       "level": "review",
       "section": "developer",
       "roots": [
@@ -150,8 +150,8 @@
     },
     {
       "id": "homebrew.oldversions",
-      "title": "Versioni vecchie di Homebrew",
-      "explanation": "Versioni superate dei pacchetti installati. Elimina anche la cache di Homebrew.",
+      "title": "Old Homebrew versions",
+      "explanation": "Outdated versions of installed packages. Also deletes the Homebrew cache.",
       "level": "review",
       "section": "developer",
       "roots": [

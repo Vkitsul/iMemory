@@ -18,7 +18,7 @@ final class AutomationModel {
     private let notifies: Bool
 
     /// - Parameter notifies: Off in the self-check, which must not ask for permissions.
-    init(file: URL = AppStorage.folder.appendingPathComponent("automazione.json"), notifies: Bool = true) {
+    init(file: URL = AppStorage.folder.appendingPathComponent("automation.json"), notifies: Bool = true) {
         self.file = file
         self.notifies = notifies
         let loaded = AutomationSettings.load(from: file)
@@ -59,8 +59,8 @@ final class AutomationModel {
         }
         if watch.shouldWarn(free: capacity.available), settings.warnsOnLowSpace {
             notify(
-                title: "Spazio su disco in esaurimento",
-                body: "Restano \(Format.bytes(free)). Apri iMemory per vedere cosa puoi liberare."
+                title: "Disk space is running low",
+                body: "\(Format.bytes(free)) left. Open iMemory to see what you can free."
             )
         }
     }
@@ -72,8 +72,8 @@ final class AutomationModel {
     func recordScheduledCleanup(_ report: CleanupReport) {
         update { $0.lastScheduledCleanup = report.date }
         notify(
-            title: "Pulizia programmata eseguita",
-            body: "\(Format.items(report.removedItemCount)) eliminate. I dettagli sono in Cronologia."
+            title: "Scheduled cleanup done",
+            body: "Deleted \(Format.items(report.removedItemCount)). Details are in History."
         )
     }
 
@@ -93,15 +93,15 @@ struct AutomationView: View {
 
     var body: some View {
         Form {
-            Section("Barra dei menu") {
-                Toggle("Mostra l'icona nella barra dei menu", isOn: Binding(
+            Section("Menu bar") {
+                Toggle("Show the icon in the menu bar", isOn: Binding(
                     get: { model.settings.showsMenuBarIcon },
                     set: { value in model.update { $0.showsMenuBarIcon = value } }
                 ))
             }
 
             Section {
-                Toggle("Avvisami quando lo spazio è poco", isOn: Binding(
+                Toggle("Warn me when space runs low", isOn: Binding(
                     get: { model.settings.warnsOnLowSpace },
                     set: { model.enableWarnings($0) }
                 ))
@@ -109,45 +109,45 @@ struct AutomationView: View {
                     get: { model.settings.lowSpaceThresholdGB },
                     set: { value in model.update { $0.lowSpaceThresholdGB = value } }
                 ), in: 5...200, step: 5) {
-                    LabeledContent("Sotto questa soglia", value: "\(model.settings.lowSpaceThresholdGB) GB")
+                    LabeledContent("Below", value: "\(model.settings.lowSpaceThresholdGB) GB")
                 }
                 .disabled(!model.settings.warnsOnLowSpace)
                 if model.notificationsDenied {
-                    Text("macOS non consente le notifiche a iMemory. L'icona nella barra dei menu cambia comunque. Puoi attivarle in Impostazioni di Sistema, Notifiche.")
+                    Text("macOS doesn't allow notifications from iMemory. The menu bar icon still changes. You can turn them on in System Settings, Notifications.")
                         .font(.callout)
                         .foregroundStyle(.orange)
                 }
             } header: {
-                Text("Spazio su disco")
+                Text("Disk space")
             } footer: {
-                Text("Ora liberi: \(Format.bytes(model.free)). L'avviso arriva una volta sola, e di nuovo solo dopo che lo spazio è tornato sopra la soglia.")
+                Text("Free now: \(Format.bytes(model.free)). You're warned once, and again only after space has gone back above the threshold.")
             }
 
             Section {
-                Toggle("Pulisci automaticamente le voci sicure", isOn: Binding(
+                Toggle("Clean safe items automatically", isOn: Binding(
                     get: { model.settings.cleansOnSchedule },
                     set: { value in model.update { $0.setCleansOnSchedule(value) } }
                 ))
-                Picker("Frequenza", selection: Binding(
+                Picker("Frequency", selection: Binding(
                     get: { model.settings.interval },
                     set: { value in model.update { $0.interval = value } }
                 )) {
-                    Text("Ogni settimana").tag(AutomationSettings.Interval.weekly)
-                    Text("Ogni mese").tag(AutomationSettings.Interval.monthly)
+                    Text("Every week").tag(AutomationSettings.Interval.weekly)
+                    Text("Every month").tag(AutomationSettings.Interval.monthly)
                 }
                 .disabled(!model.settings.cleansOnSchedule)
                 if let last = model.settings.lastScheduledCleanup {
-                    LabeledContent("Ultima pulizia", value: Format.dateTime(last))
+                    LabeledContent("Last cleanup", value: Format.dateTime(last))
                 }
             } header: {
-                Text("Pulizia programmata")
+                Text("Scheduled cleanup")
             } footer: {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Elimina senza chiedere, e non passa dal Cestino. La prima pulizia avviene dopo un intero intervallo dall'attivazione, e solo mentre iMemory è aperta. Ogni esecuzione finisce in Cronologia.")
+                    Text("Deletes without asking, and doesn't use the Trash. The first cleanup happens a full interval after you turn it on, and only while iMemory is open. Every run is recorded in History.")
                     Text(eligible.isEmpty
-                        ? "Ora non ci sarebbe niente da eliminare."
-                        : "Ora eliminerebbe: \(eligible.map { "\($0.rule.title) (\(Format.bytes($0.allocated)))" }.joined(separator: ", ")).")
-                    Text("Non riguarda mai app, file personali, comandi degli strumenti o voci da valutare.")
+                        ? "Right now there would be nothing to delete."
+                        : "Right now it would delete: \(eligible.map { "\($0.rule.title) (\(Format.bytes($0.allocated)))" }.joined(separator: ", ")).")
+                    Text("It never touches apps, personal files, tool commands, or items to review.")
                 }
             }
         }
@@ -162,22 +162,22 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Text("\(Format.bytes(model.automation.free)) liberi")
+        Text("\(Format.bytes(model.automation.free)) free")
         if model.automation.isLow {
-            Text("Spazio in esaurimento")
+            Text("Running low on space")
         }
         Divider()
-        Button("Apri iMemory") {
+        Button("Open iMemory") {
             openWindow(id: "main")
             NSApp.activate()
         }
-        Button("Vai a Pulizia") {
+        Button("Go to Cleanup") {
             model.section = .cleanup
             openWindow(id: "main")
             NSApp.activate()
         }
         Divider()
-        Button("Esci") {
+        Button("Quit") {
             NSApp.terminate(nil)
         }
     }

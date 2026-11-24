@@ -34,15 +34,15 @@ struct AppsView: View {
                     .id(selected.id)
                 } else {
                     ContentUnavailableView(
-                        "Scegli un'app",
+                        "Choose an app",
                         systemImage: "app.dashed",
-                        description: Text("Vedi quanto occupa, cosa ha lasciato nella Libreria e quanto spazio torna togliendola.")
+                        description: Text("See how much space it takes, what it left in the Library, and how much you get back by removing it.")
                     )
                 }
             }
             .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
         }
-        .searchable(text: $searchText, placement: .toolbar, prompt: "Cerca un'app")
+        .searchable(text: $searchText, placement: .toolbar, prompt: "Search apps")
         .task {
             while !Task.isCancelled {
                 running = RunningProcesses.names()
@@ -86,7 +86,7 @@ private struct AppRow: View {
 
 /// Spotlight often has no record of an app, and that must never read as "never used".
 private func lastUsedText(_ date: Date?) -> String {
-    date.map { "Usata il \(Format.date($0))" } ?? "Ultimo utilizzo non noto"
+    date.map { "Last used \(Format.date($0))" } ?? "Last used: unknown"
 }
 
 private struct AppDetail: View {
@@ -107,7 +107,7 @@ private struct AppDetail: View {
                         Text(app.name)
                             .font(.title2.weight(.medium))
                         if let version = app.version {
-                            Text("Versione \(version)")
+                            Text("Version \(version)")
                                 .foregroundStyle(.secondary)
                         }
                         Text(lastUsedText(app.lastUsed))
@@ -118,16 +118,16 @@ private struct AppDetail: View {
                 VStack(spacing: 0) {
                     row("App", value: Format.bytes(app.allocated))
                     Divider()
-                    row("Nella Libreria", value: Format.bytes(app.leftoversSize))
+                    row("In the Library", value: Format.bytes(app.leftoversSize))
                     Divider()
-                    row("Solo l'app, spazio che torna", value: estimate.map { Format.bytes($0.recoverable) } ?? "Calcolo…")
-                        .help("Più basso di quanto occupa se condivide spazio con altri file tramite cloni APFS.")
+                    row("App alone, space you get back", value: estimate.map { Format.bytes($0.recoverable) } ?? "Calculating…")
+                        .help("Lower than its size when it shares space with other files through APFS clones.")
                 }
                 .background(.background.secondary, in: .rect(cornerRadius: 8))
 
                 if !app.leftovers.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Nella Libreria")
+                        Text("In the Library")
                             .font(.headline)
                         VStack(spacing: 0) {
                             ForEach(app.leftovers) { leftover in
@@ -142,16 +142,16 @@ private struct AppDetail: View {
                 }
 
                 HStack {
-                    Button("Mostra nel Finder") {
+                    Button("Show in Finder") {
                         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: app.path)])
                     }
                     Spacer()
                     if isRunning {
-                        Text("Chiudi \(app.name) per disinstallarla")
+                        Text("Quit \(app.name) to uninstall it")
                             .font(.callout)
                             .foregroundStyle(.orange)
                     }
-                    Button("Disinstalla…", action: uninstall)
+                    Button("Uninstall…", action: uninstall)
                         .disabled(isRunning)
                 }
             }
@@ -206,11 +206,11 @@ private struct LeftoverRow: View {
 
 func description(of leftover: Leftover) -> String {
     let kind = switch leftover.kind {
-    case .cache: "File temporanei"
-    case .settings: "Impostazioni"
-    case .data: "Dati dell'app: possono contenere il tuo lavoro"
+    case .cache: "Temporary files"
+    case .settings: "Settings"
+    case .data: "App data: may contain your work"
     }
-    return leftover.matchedByIdentifier ? kind : "\(kind). Trovato solo per nome: potrebbe appartenere ad altro"
+    return leftover.matchedByIdentifier ? kind : "\(kind). Found by name only: it may belong to something else"
 }
 
 /// Confirmation, progress, and report for anything going to the Trash.
@@ -229,7 +229,7 @@ struct TrashSheet: View {
             case .running:
                 VStack(spacing: 14) {
                     ProgressView()
-                    Text("Spostamento nel Cestino")
+                    Text("Moving to the Trash")
                 }
                 .padding(30)
             case .finished(let report):
@@ -241,9 +241,9 @@ struct TrashSheet: View {
 
     private func confirmation(_ request: TrashModel.Request) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(request.executable == nil ? "Spostare \(Format.items(request.items.count)) nel Cestino?" : "Disinstallare \(request.title)?")
+            Text(request.executable == nil ? "Move \(Format.items(request.items.count)) to the Trash?" : "Uninstall \(request.title)?")
                 .font(.title2.weight(.medium))
-            Text("Vanno nel Cestino, da cui si possono ripristinare. Lo spazio si libera solo svuotandolo.")
+            Text("They go to the Trash, where you can restore them. The space is freed only when you empty it.")
                 .fixedSize(horizontal: false, vertical: true)
             if let note = request.note {
                 Text(note)
@@ -301,10 +301,10 @@ struct TrashSheet: View {
 
             HStack {
                 Spacer()
-                Button("Annulla", role: .cancel) { trash.cancel() }
+                Button("Cancel", role: .cancel) { trash.cancel() }
                     .keyboardShortcut(.cancelAction)
                 // Not the default action: Return must not move anything.
-                Button("Sposta nel Cestino", role: .destructive) { trash.confirm() }
+                Button("Move to Trash", role: .destructive) { trash.confirm() }
             }
         }
         .padding(20)

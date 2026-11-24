@@ -66,74 +66,74 @@ final class FakeHome {
 
 private let cacheRule = CleaningRule(
     id: "test.cache",
-    title: "Cache di prova",
+    title: "Sample cache",
     explanation: "",
     level: .safe,
-    roots: ["~/Library/Caches/Prova"]
+    roots: ["~/Library/Caches/Sample"]
 )
 
 private func firstIssue(_ report: CleanupReport) -> RemovalProblem? {
     report.rules.first?.issues.first?.problem
 }
 
-@Suite("Eliminazione: percorso normale")
+@Suite("Removal: normal path")
 struct RemovalTests {
-    @Test("Elimina il contenuto e lascia la cartella")
+    @Test("Deletes the contents and keeps the folder")
     func removesContentsKeepsRoot() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/sotto/ancora")
-        try home.file("Library/Caches/Prova/a")
-        try home.file("Library/Caches/Prova/sotto/b")
-        try home.file("Library/Caches/Prova/sotto/ancora/c")
+        try home.folder("Library/Caches/Sample/sub/deeper")
+        try home.file("Library/Caches/Sample/a")
+        try home.file("Library/Caches/Sample/sub/b")
+        try home.file("Library/Caches/Sample/sub/deeper/c")
         try home.file("Library/Caches/Altra")
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(home.exists("Library/Caches/Prova"))
-        #expect(!home.exists("Library/Caches/Prova/a"))
-        #expect(!home.exists("Library/Caches/Prova/sotto"))
+        #expect(home.exists("Library/Caches/Sample"))
+        #expect(!home.exists("Library/Caches/Sample/a"))
+        #expect(!home.exists("Library/Caches/Sample/sub"))
         #expect(home.exists("Library/Caches/Altra"))
         #expect(report.issueCount == 0)
         #expect(report.removedItemCount == 2)
         #expect(report.rules[0].removedBytes >= 30_000)
     }
 
-    @Test("Le voci comparse dopo la scansione restano")
+    @Test("Items that appeared after the scan stay")
     func newEntriesSurvive() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/vecchio")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/old")
 
         let plan = try await home.plan(cacheRule)
-        try home.file("Library/Caches/Prova/nuovo")
+        try home.file("Library/Caches/Sample/new")
         _ = await home.executor().run([plan])
 
-        #expect(!home.exists("Library/Caches/Prova/vecchio"))
-        #expect(home.exists("Library/Caches/Prova/nuovo"))
+        #expect(!home.exists("Library/Caches/Sample/old"))
+        #expect(home.exists("Library/Caches/Sample/new"))
     }
 
-    @Test("Le voci già sparite non sono un errore")
+    @Test("Items already gone aren't an error")
     func missingEntryIsFine() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
 
         let plan = try await home.plan(cacheRule)
-        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Prova/f"))
+        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Sample/f"))
         let report = await home.executor().run([plan])
 
         #expect(report.issueCount == 0)
     }
 
-    @Test("La regola per età elimina solo i file vecchi, anche annidati")
+    @Test("The age rule removes only old files, nested ones too")
     func ageRule() async throws {
         let home = try FakeHome()
         try home.folder("Library/Logs/App")
-        try home.file("Library/Logs/recente")
-        try home.file("Library/Logs/App/vecchio")
-        try home.file("Library/Logs/App/recente")
+        try home.file("Library/Logs/recent")
+        try home.file("Library/Logs/App/old")
+        try home.file("Library/Logs/App/recent")
         var times = [timeval(tv_sec: 1_000_000_000, tv_usec: 0), timeval(tv_sec: 1_000_000_000, tv_usec: 0)]
-        #expect(utimes(home.at("Library/Logs/App/vecchio"), &times) == 0)
+        #expect(utimes(home.at("Library/Logs/App/old"), &times) == 0)
 
         let rule = CleaningRule(id: "logs", title: "", explanation: "", level: .safe, roots: ["~/Library/Logs"], minimumAgeDays: 30)
         let plan = try await home.plan(rule)
@@ -141,17 +141,17 @@ struct RemovalTests {
 
         _ = await home.executor().run([plan])
 
-        #expect(!home.exists("Library/Logs/App/vecchio"))
-        #expect(home.exists("Library/Logs/App/recente"))
-        #expect(home.exists("Library/Logs/recente"))
+        #expect(!home.exists("Library/Logs/App/old"))
+        #expect(home.exists("Library/Logs/App/recent"))
+        #expect(home.exists("Library/Logs/recent"))
     }
 
-    @Test("L'annullamento ferma prima della voce successiva")
+    @Test("Cancelling stops before the next item")
     func cancellation() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
+        try home.folder("Library/Caches/Sample")
         for index in 0..<5 {
-            try home.file("Library/Caches/Prova/f\(index)")
+            try home.file("Library/Caches/Sample/f\(index)")
         }
         let plan = try await home.plan(cacheRule)
         let executor = home.executor()
@@ -161,181 +161,181 @@ struct RemovalTests {
 
         #expect(report.wasCancelled)
         #expect(report.removedItemCount == 0)
-        #expect(home.exists("Library/Caches/Prova/f0"))
+        #expect(home.exists("Library/Caches/Sample/f0"))
     }
 }
 
-@Suite("Eliminazione: casi avversi")
+@Suite("Removal: adversarial cases")
 struct AdversarialTests {
-    @Test("Una radice che è un link simbolico viene rifiutata")
+    @Test("A root that is a symbolic link is refused")
     func rootIsSymlink() async throws {
         let home = try FakeHome()
         try home.folder("Library/Caches")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
-        try home.link("Library/Caches/Prova", to: home.at("Documents"))
+        try home.file("Documents/thesis")
+        try home.link("Library/Caches/Sample", to: home.at("Documents"))
 
-        // Il piano è costruito a mano: la scansione non segue i link, quindi non ne produrrebbe uno.
+        // The plan is built by hand: the scan doesn't follow links, so it wouldn't produce one.
         let plan = CleanupCandidate(rule: cacheRule, roots: [
-            PlanRoot(path: home.at("Library/Caches/Prova"), fileID: 1, items: [
-                PlanItem(relativePath: "tesi", fileID: 1, allocated: 1, privateBytes: 1),
+            PlanRoot(path: home.at("Library/Caches/Sample"), fileID: 1, items: [
+                PlanItem(relativePath: "thesis", fileID: 1, allocated: 1, privateBytes: 1),
             ]),
         ])
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Documents/tesi"))
+        #expect(home.exists("Documents/thesis"))
         #expect(firstIssue(report) == .symbolicLinkInPath)
     }
 
-    @Test("Una radice sostituita da un link dopo la scansione viene rifiutata")
+    @Test("A root replaced by a link after the scan is refused")
     func rootReplacedAfterScan() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/tesi")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/thesis")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
+        try home.file("Documents/thesis")
 
         let plan = try await home.plan(cacheRule)
-        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Prova"))
-        try home.link("Library/Caches/Prova", to: home.at("Documents"))
+        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Sample"))
+        try home.link("Library/Caches/Sample", to: home.at("Documents"))
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Documents/tesi"))
+        #expect(home.exists("Documents/thesis"))
         #expect(firstIssue(report) == .symbolicLinkInPath)
     }
 
-    @Test("Un link simbolico in un punto intermedio del percorso viene rifiutato")
+    @Test("A symbolic link in the middle of the path is refused")
     func symlinkInAncestor() async throws {
         let home = try FakeHome()
-        try home.folder("Altrove/Caches/Prova")
-        try home.file("Altrove/Caches/Prova/f")
+        try home.folder("Elsewhere/Caches/Sample")
+        try home.file("Elsewhere/Caches/Sample/f")
         try home.folder("Library")
 
         let plan = try await home.plan(CleaningRule(
-            id: "x", title: "", explanation: "", level: .safe, roots: ["~/Library/Caches/Prova"]
+            id: "x", title: "", explanation: "", level: .safe, roots: ["~/Library/Caches/Sample"]
         ), ifExists: false, stub: "f")
-        try home.link("Library/Caches", to: home.at("Altrove/Caches"))
+        try home.link("Library/Caches", to: home.at("Elsewhere/Caches"))
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Altrove/Caches/Prova/f"))
+        #expect(home.exists("Elsewhere/Caches/Sample/f"))
         #expect(firstIssue(report) == .symbolicLinkInPath)
     }
 
-    @Test("Un link simbolico nel piano elimina il link e non la destinazione")
+    @Test("A symbolic link in the plan removes the link, not its target")
     func symlinkItem() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
+        try home.folder("Library/Caches/Sample")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
-        try home.link("Library/Caches/Prova/fuori", to: home.at("Documents"))
+        try home.file("Documents/thesis")
+        try home.link("Library/Caches/Sample/outside", to: home.at("Documents"))
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(!home.exists("Library/Caches/Prova/fuori"))
-        #expect(home.exists("Documents/tesi"))
+        #expect(!home.exists("Library/Caches/Sample/outside"))
+        #expect(home.exists("Documents/thesis"))
         #expect(report.issueCount == 0)
     }
 
-    @Test("Un link simbolico annidato non viene attraversato")
+    @Test("A nested symbolic link isn't followed")
     func nestedSymlink() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/sotto/ancora")
+        try home.folder("Library/Caches/Sample/sub/deeper")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
-        try home.link("Library/Caches/Prova/sotto/ancora/fuori", to: home.at("Documents"))
-        try home.link("Library/Caches/Prova/sotto/file-fuori", to: home.at("Documents/tesi"))
+        try home.file("Documents/thesis")
+        try home.link("Library/Caches/Sample/sub/deeper/outside", to: home.at("Documents"))
+        try home.link("Library/Caches/Sample/sub/file-outside", to: home.at("Documents/thesis"))
 
         _ = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(!home.exists("Library/Caches/Prova/sotto"))
-        #expect(home.exists("Documents/tesi"))
+        #expect(!home.exists("Library/Caches/Sample/sub"))
+        #expect(home.exists("Documents/thesis"))
     }
 
-    @Test("Una cartella sostituita da un link durante il piano non viene seguita")
+    @Test("A folder replaced by a link after planning isn't followed")
     func directorySwappedForSymlink() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/dati")
-        try home.file("Library/Caches/Prova/dati/f")
+        try home.folder("Library/Caches/Sample/data")
+        try home.file("Library/Caches/Sample/data/f")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
+        try home.file("Documents/thesis")
 
         let plan = try await home.plan(cacheRule)
-        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Prova/dati"))
-        try home.link("Library/Caches/Prova/dati", to: home.at("Documents"))
+        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Sample/data"))
+        try home.link("Library/Caches/Sample/data", to: home.at("Documents"))
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Documents/tesi"))
+        #expect(home.exists("Documents/thesis"))
         #expect(firstIssue(report) == .changedSinceScan)
     }
 
-    @Test("Un file sostituito dopo la scansione non viene eliminato", arguments: [false, true])
+    @Test("A file replaced after the scan isn't removed", arguments: [false, true])
     func fileReplaced(sameSize: Bool) async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
 
         let plan = try await home.plan(cacheRule)
-        try home.file("Library/Caches/Prova/segnaposto")
-        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Prova/f"))
-        try home.file("Library/Caches/Prova/f", size: sameSize ? 10_000 : 77_000)
-        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Prova/segnaposto"))
+        try home.file("Library/Caches/Sample/placeholder")
+        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Sample/f"))
+        try home.file("Library/Caches/Sample/f", size: sameSize ? 10_000 : 77_000)
+        try FileManager.default.removeItem(atPath: home.at("Library/Caches/Sample/placeholder"))
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Library/Caches/Prova/f"))
+        #expect(home.exists("Library/Caches/Sample/f"))
         #expect(firstIssue(report) == .changedSinceScan)
     }
 
-    @Test("Una radice ricreata dopo la scansione viene rifiutata")
+    @Test("A root recreated after the scan is refused")
     func rootRecreated() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
 
         let plan = try await home.plan(cacheRule)
-        try FileManager.default.moveItem(atPath: home.at("Library/Caches/Prova"), toPath: home.at("Library/Caches/Spostata"))
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
+        try FileManager.default.moveItem(atPath: home.at("Library/Caches/Sample"), toPath: home.at("Library/Caches/Moved"))
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Library/Caches/Prova/f"))
-        #expect(home.exists("Library/Caches/Spostata/f"))
+        #expect(home.exists("Library/Caches/Sample/f"))
+        #expect(home.exists("Library/Caches/Moved/f"))
         #expect(firstIssue(report) == .changedSinceScan)
     }
 
-    @Test("Un percorso di voce che esce dalla radice viene rifiutato", arguments: [
-        "../fuori", "sotto/../../fuori", "/etc/hosts", "./f", "", "a//b", "..",
+    @Test("An item path that leaves its root is refused", arguments: [
+        "../outside", "sub/../../outside", "/etc/hosts", "./f", "", "a//b", "..",
     ])
     func itemEscapesRoot(path: String) async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/sotto")
-        try home.file("Library/Caches/fuori")
+        try home.folder("Library/Caches/Sample/sub")
+        try home.file("Library/Caches/outside")
 
-        let rootID = try #require(try FileManager.default.attributesOfItem(atPath: home.at("Library/Caches/Prova"))[.systemFileNumber] as? UInt64)
+        let rootID = try #require(try FileManager.default.attributesOfItem(atPath: home.at("Library/Caches/Sample"))[.systemFileNumber] as? UInt64)
         let plan = CleanupCandidate(rule: cacheRule, roots: [
-            PlanRoot(path: home.at("Library/Caches/Prova"), fileID: rootID, items: [
+            PlanRoot(path: home.at("Library/Caches/Sample"), fileID: rootID, items: [
                 PlanItem(relativePath: path, fileID: 1, allocated: 1, privateBytes: 1),
             ]),
         ])
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Library/Caches/fuori"))
+        #expect(home.exists("Library/Caches/outside"))
         #expect(firstIssue(report) == .outsideRoot)
     }
 
-    @Test("Un piano con una radice che la regola non nomina viene rifiutato")
+    @Test("A plan with a root the rule doesn't name is refused")
     func rootNotInRule() async throws {
         let home = try FakeHome()
         try home.folder("Documents")
-        try home.file("Documents/tesi")
+        try home.file("Documents/thesis")
         let attributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents"))
-        let fileAttributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents/tesi"))
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents/thesis"))
 
         let plan = CleanupCandidate(rule: cacheRule, roots: [
             PlanRoot(
                 path: home.at("Documents"),
                 fileID: try #require(attributes[.systemFileNumber] as? UInt64),
                 items: [PlanItem(
-                    relativePath: "tesi",
+                    relativePath: "thesis",
                     fileID: try #require(fileAttributes[.systemFileNumber] as? UInt64),
                     allocated: 1,
                     privateBytes: 1
@@ -344,25 +344,25 @@ struct AdversarialTests {
         ])
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Documents/tesi"))
+        #expect(home.exists("Documents/thesis"))
         #expect(firstIssue(report) == .outsideRoot)
     }
 
-    @Test("Un piano con una regola non valida viene rifiutato anche se costruito a mano")
+    @Test("A plan with an invalid rule is refused even when built by hand")
     func invalidRuleInPlan() async throws {
         let home = try FakeHome()
         try home.folder("Documents")
-        try home.file("Documents/tesi")
+        try home.file("Documents/thesis")
         let attributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents"))
-        let fileAttributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents/tesi"))
-        let badRule = CleaningRule(id: "cattiva", title: "", explanation: "", level: .safe, roots: ["~/Documents"])
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: home.at("Documents/thesis"))
+        let badRule = CleaningRule(id: "bad", title: "", explanation: "", level: .safe, roots: ["~/Documents"])
 
         let plan = CleanupCandidate(rule: badRule, roots: [
             PlanRoot(
                 path: home.at("Documents"),
                 fileID: try #require(attributes[.systemFileNumber] as? UInt64),
                 items: [PlanItem(
-                    relativePath: "tesi",
+                    relativePath: "thesis",
                     fileID: try #require(fileAttributes[.systemFileNumber] as? UInt64),
                     allocated: 1,
                     privateBytes: 1
@@ -371,120 +371,120 @@ struct AdversarialTests {
         ])
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Documents/tesi"))
+        #expect(home.exists("Documents/thesis"))
         #expect(firstIssue(report) == .outsideRoot)
     }
 
-    @Test("Con l'app proprietaria aperta la regola non tocca nulla")
+    @Test("The rule touches nothing while its owner app is open")
     func ownerRunning() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
-        let rule = CleaningRule(id: "app", title: "", explanation: "", level: .review, roots: ["~/Library/Caches/Prova"], ownerProcesses: ["App Di Prova"])
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
+        let rule = CleaningRule(id: "app", title: "", explanation: "", level: .review, roots: ["~/Library/Caches/Sample"], ownerProcesses: ["Sample App"])
 
         let plan = try await home.plan(rule)
-        let report = await home.executor(running: ["App Di Prova"]).run([plan])
+        let report = await home.executor(running: ["Sample App"]).run([plan])
 
-        #expect(home.exists("Library/Caches/Prova/f"))
-        #expect(report.rules[0].blockedBy == ["App Di Prova"])
+        #expect(home.exists("Library/Caches/Sample/f"))
+        #expect(report.rules[0].blockedBy == ["Sample App"])
         #expect(report.removedItemCount == 0)
     }
 
-    @Test("Un hard link eliminato non tocca l'altro nome del file")
+    @Test("Removing a hard link doesn't touch the file's other name")
     func hardLinkSurvives() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
+        try home.folder("Library/Caches/Sample")
         try home.folder("Documents")
-        try home.file("Documents/tesi")
-        try FileManager.default.linkItem(atPath: home.at("Documents/tesi"), toPath: home.at("Library/Caches/Prova/link"))
+        try home.file("Documents/thesis")
+        try FileManager.default.linkItem(atPath: home.at("Documents/thesis"), toPath: home.at("Library/Caches/Sample/link"))
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(!home.exists("Library/Caches/Prova/link"))
-        #expect(home.exists("Documents/tesi"))
+        #expect(!home.exists("Library/Caches/Sample/link"))
+        #expect(home.exists("Documents/thesis"))
         #expect(report.rules[0].removedBytes == 0)
     }
 
-    @Test("Una cartella illeggibile è segnalata e il resto viene eliminato")
+    @Test("An unreadable folder is reported and the rest is removed")
     func unreadableSubfolder() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/dati/chiusa")
-        try home.file("Library/Caches/Prova/dati/chiusa/f")
-        try home.file("Library/Caches/Prova/dati/aperto")
-        try home.file("Library/Caches/Prova/altro")
+        try home.folder("Library/Caches/Sample/data/locked")
+        try home.file("Library/Caches/Sample/data/locked/f")
+        try home.file("Library/Caches/Sample/data/open")
+        try home.file("Library/Caches/Sample/altro")
 
         let plan = try await home.plan(cacheRule)
-        #expect(chmod(home.at("Library/Caches/Prova/dati/chiusa"), 0) == 0)
-        defer { chmod(home.at("Library/Caches/Prova/dati/chiusa"), 0o755) }
+        #expect(chmod(home.at("Library/Caches/Sample/data/locked"), 0) == 0)
+        defer { chmod(home.at("Library/Caches/Sample/data/locked"), 0o755) }
         let report = await home.executor().run([plan])
 
-        #expect(!home.exists("Library/Caches/Prova/altro"))
-        #expect(!home.exists("Library/Caches/Prova/dati/aperto"))
-        #expect(home.exists("Library/Caches/Prova/dati/chiusa/f") || firstIssue(report) != nil)
+        #expect(!home.exists("Library/Caches/Sample/altro"))
+        #expect(!home.exists("Library/Caches/Sample/data/open"))
+        #expect(home.exists("Library/Caches/Sample/data/locked/f") || firstIssue(report) != nil)
         #expect(firstIssue(report) == .system(code: EACCES))
     }
 
-    @Test("Un file protetto è segnalato e il resto viene eliminato")
+    @Test("A protected file is reported and the rest is removed")
     func immutableFile() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/protetto")
-        try home.file("Library/Caches/Prova/normale")
-        #expect(chflags(home.at("Library/Caches/Prova/protetto"), UInt32(UF_IMMUTABLE)) == 0)
-        defer { chflags(home.at("Library/Caches/Prova/protetto"), 0) }
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/protected")
+        try home.file("Library/Caches/Sample/plain")
+        #expect(chflags(home.at("Library/Caches/Sample/protected"), UInt32(UF_IMMUTABLE)) == 0)
+        defer { chflags(home.at("Library/Caches/Sample/protected"), 0) }
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(home.exists("Library/Caches/Prova/protetto"))
-        #expect(!home.exists("Library/Caches/Prova/normale"))
+        #expect(home.exists("Library/Caches/Sample/protected"))
+        #expect(!home.exists("Library/Caches/Sample/plain"))
         #expect(report.issueCount == 1)
     }
 
-    @Test("Un volume montato dentro la cartella non viene toccato")
+    @Test("A volume mounted inside the folder isn't touched")
     func mountedVolume() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/dati/volume")
-        try home.file("Library/Caches/Prova/dati/f")
-        let image = home.at("disco.dmg")
+        try home.folder("Library/Caches/Sample/data/volume")
+        try home.file("Library/Caches/Sample/data/f")
+        let image = home.at("disk.dmg")
         try runTool("/usr/bin/hdiutil", ["create", "-size", "5m", "-fs", "APFS", "-volname", "ProvaIMemory", "-quiet", image])
-        try runTool("/usr/bin/hdiutil", ["attach", image, "-mountpoint", home.at("Library/Caches/Prova/dati/volume"), "-nobrowse", "-quiet"])
-        defer { try? runTool("/usr/bin/hdiutil", ["detach", home.at("Library/Caches/Prova/dati/volume"), "-force", "-quiet"]) }
-        try home.file("Library/Caches/Prova/dati/volume/dentro")
+        try runTool("/usr/bin/hdiutil", ["attach", image, "-mountpoint", home.at("Library/Caches/Sample/data/volume"), "-nobrowse", "-quiet"])
+        defer { try? runTool("/usr/bin/hdiutil", ["detach", home.at("Library/Caches/Sample/data/volume"), "-force", "-quiet"]) }
+        try home.file("Library/Caches/Sample/data/volume/inside")
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
-        #expect(home.exists("Library/Caches/Prova/dati/volume/dentro"))
-        #expect(!home.exists("Library/Caches/Prova/dati/f"))
+        #expect(home.exists("Library/Caches/Sample/data/volume/inside"))
+        #expect(!home.exists("Library/Caches/Sample/data/f"))
         #expect(firstIssue(report) == .otherVolume)
     }
 
-    @Test("I percorsi oltre PATH_MAX vengono eliminati")
+    @Test("Paths beyond PATH_MAX are removed")
     func deepPath() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
+        try home.folder("Library/Caches/Sample")
         let component = String(repeating: "p", count: 200)
-        var descriptor = open(home.at("Library/Caches/Prova"), O_RDONLY | O_DIRECTORY)
+        var descriptor = open(home.at("Library/Caches/Sample"), O_RDONLY | O_DIRECTORY)
         for _ in 0..<30 {
             #expect(mkdirat(descriptor, component, 0o755) == 0)
             let next = openat(descriptor, component, O_RDONLY | O_DIRECTORY)
             close(descriptor)
             descriptor = next
         }
-        close(openat(descriptor, "in-fondo", O_CREAT | O_WRONLY, 0o644))
+        close(openat(descriptor, "at-the-bottom", O_CREAT | O_WRONLY, 0o644))
         close(descriptor)
 
         let report = await home.executor().run([try await home.plan(cacheRule)])
 
         #expect(report.issueCount == 0)
-        #expect(!home.exists("Library/Caches/Prova/" + component))
+        #expect(!home.exists("Library/Caches/Sample/" + component))
     }
 }
 
-@Suite("Spazio misurato", .serialized)
+@Suite("Measured space", .serialized)
 struct MeasuredSpaceTests {
     /// Every test that compares against what the volume reports belongs in this suite:
     /// run side by side, they write hundreds of MB and falsify each other's figures.
-    @Test("La stima del recupero coincide con lo spazio davvero liberato", arguments: [true, false])
+    @Test("The recovery estimate matches the space really freed", arguments: [true, false])
     func estimateMatchesRealDeletion(cloneInside: Bool) throws {
         // Other apps write to the disk too, so a single reading can be off. A wrong estimate
         // fails every attempt, while outside noise doesn't last for three in a row.
@@ -493,8 +493,8 @@ struct MeasuredSpaceTests {
             let home = try FakeHome()
             try home.folder("app")
             try home.file("app/a", size: 100_000_000)
-            try home.file("app/normale", size: 50_000_000)
-            #expect(clonefile(home.at("app/a"), home.at(cloneInside ? "app/b" : "fuori"), 0) == 0)
+            try home.file("app/plain", size: 50_000_000)
+            #expect(clonefile(home.at("app/a"), home.at(cloneInside ? "app/b" : "outside"), 0) == 0)
 
             let estimate = RecoveryEstimator.estimate(paths: [home.at("app")])
             #expect(estimate.recoverable >= (cloneInside ? 149_000_000 : 49_000_000))
@@ -505,16 +505,16 @@ struct MeasuredSpaceTests {
             let freed = before - (try VolumeCapacity(path: "/System/Volumes/Data").volumeUsed)
 
             if abs(Double(freed - estimate.recoverable)) <= 10_000_000 { return }
-            attempts.append("liberati \(freed), stimati \(estimate.recoverable)")
+            attempts.append("freed \(freed), estimated \(estimate.recoverable)")
         }
-        Issue.record("mai entro 10 MB: \(attempts)")
+        Issue.record("never within 10 MB: \(attempts)")
     }
 
-    @Test("Il volume si legge una volta prima e una dopo, senza attese")
+    @Test("The volume is read once before and once after, without waiting")
     func readsVolumeOnlyTwice() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
         let plan = try await home.plan(cacheRule)
 
         let reads = Mutex<[Int64]>([1_000, 400])
@@ -534,7 +534,7 @@ struct MeasuredSpaceTests {
         #expect(count.withLock { $0 } == 2)
     }
 
-    @Test("I due dati divergono solo oltre il margine")
+    @Test("The two figures diverge only beyond the margin")
     func divergence() {
         func report(measured: Int64, removed: Int64) -> CleanupReport {
             var rule = RuleResult(ruleID: "r", title: "", expectedAllocated: 0, expectedPrivate: 0)
@@ -550,37 +550,37 @@ struct MeasuredSpaceTests {
 
     /// Writes and frees real space on the data volume, inside the fake home. Other
     /// activity on the disk moves the figure a little, hence the large file.
-    @Test("Lo spazio misurato è entro il 5% di quello atteso")
+    @Test("The measured space is within 5% of the expected")
     func measuredMatchesExpected() async throws {
         // As above: outside noise doesn't last for three attempts, a real error does.
         var attempts: [String] = []
         for _ in 0..<3 {
             let home = try FakeHome()
-            try home.folder("Library/Caches/Prova")
+            try home.folder("Library/Caches/Sample")
             for index in 0..<4 {
-                try home.file("Library/Caches/Prova/f\(index)", size: 100_000_000)
+                try home.file("Library/Caches/Sample/f\(index)", size: 100_000_000)
             }
             let plan = try await home.plan(cacheRule)
             let report = await home.executor().run([plan])
 
             let expected = Double(report.expectedAllocated)
             #expect(expected >= 400_000_000)
-            // Il dato sui file non dipende dalle altre app, quindi deve tornare sempre.
+            // The file figure doesn't depend on other apps, so it must always match.
             #expect(abs(Double(report.rules[0].removedBytes) - expected) <= expected * 0.01)
 
             if abs(Double(report.measuredFreed) - expected) <= expected * 0.05 { return }
-            attempts.append("misurato \(report.measuredFreed), atteso \(report.expectedAllocated)")
+            attempts.append("measured \(report.measuredFreed), expected \(report.expectedAllocated)")
         }
-        Issue.record("mai entro il 5%: \(attempts)")
+        Issue.record("never within 5%: \(attempts)")
     }
 
-    @Test("Eliminare un clone libera poco, e la stima privata lo prevede")
+    @Test("Deleting a clone frees little, and the private estimate predicts it")
     func cloneFreesLittle() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.folder("Altrove")
-        try home.file("Altrove/originale", size: 200_000_000)
-        #expect(clonefile(home.at("Altrove/originale"), home.at("Library/Caches/Prova/clone"), 0) == 0)
+        try home.folder("Library/Caches/Sample")
+        try home.folder("Elsewhere")
+        try home.file("Elsewhere/original", size: 200_000_000)
+        #expect(clonefile(home.at("Elsewhere/original"), home.at("Library/Caches/Sample/clone"), 0) == 0)
 
         let plan = try await home.plan(cacheRule)
         #expect(plan.allocated >= 200_000_000)
@@ -588,14 +588,14 @@ struct MeasuredSpaceTests {
 
         let report = await home.executor().run([plan])
 
-        #expect(home.exists("Altrove/originale"))
-        #expect(report.measuredFreed < 20_000_000, "misurato \(report.measuredFreed)")
+        #expect(home.exists("Elsewhere/original"))
+        #expect(report.measuredFreed < 20_000_000, "measured \(report.measuredFreed)")
     }
 }
 
-@Suite("Regole")
+@Suite("Rules")
 struct RuleTests {
-    @Test("Il catalogo incluso è valido")
+    @Test("The built-in catalog is valid")
     func builtInCatalog() throws {
         let catalog = try RuleCatalog.builtIn()
         #expect(!catalog.rules.isEmpty)
@@ -604,20 +604,20 @@ struct RuleTests {
         }
     }
 
-    @Test("Le radici vietate vengono rifiutate", arguments: [
+    @Test("Forbidden roots are refused", arguments: [
         "~", "~/", "/", "/System", "/Applications", "/Users", "~/Documents", "~/Desktop", "~/Downloads",
         "~/Pictures", "~/Library", "~/Library/Caches", "~/Library/Application Support",
         "~/Library/Application Support/Claude", "~/Library/Caches/../../Documents",
         "~/Library/Caches/./X", "~/Library/Caches//X", "~/Library/Logs/../Mail", "~/.npm", "Library/Caches/X",
         "~/Library/Developer/CoreSimulator/Devices",
-        "~/Library/CachesFalsa/X", "~/Library/LogsFalsi",
+        "~/Library/CachesFake/X", "~/Library/LogsFake",
     ])
     func forbiddenRoots(root: String) {
         let rule = CleaningRule(id: "x", title: "t", explanation: "e", level: .safe, roots: [root])
         #expect(throws: RuleError.self) { try RuleCatalog(rules: [rule]) }
     }
 
-    @Test("Un catalogo con una regola non valida viene rifiutato per intero")
+    @Test("A catalog with an invalid rule is refused as a whole")
     func invalidCatalog() throws {
         let json = #"{"version":1,"rules":[{"id":"a","title":"t","explanation":"e","level":"safe","roots":["~/Documents"],"ownerProcesses":[]}]}"#
         #expect(throws: RuleError.rootNotAllowed(rule: "a", root: "~/Documents")) {
@@ -625,29 +625,29 @@ struct RuleTests {
         }
     }
 
-    @Test("Due regole con lo stesso identificativo vengono rifiutate")
+    @Test("Two rules with the same identifier are refused")
     func duplicateIDs() {
         let rule = CleaningRule(id: "x", title: "t", explanation: "e", level: .safe, roots: ["~/Library/Caches/X"])
         #expect(throws: RuleError.duplicateID("x")) { try RuleCatalog(rules: [rule, rule]) }
     }
 
-    @Test("Il piano esclude le voci solo nel cloud, le cartelle illeggibili e i volumi montati")
+    @Test("The plan leaves out cloud-only items, unreadable folders, and mounted volumes")
     func plannerSkipsUnreadable() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova/chiusa")
-        try home.file("Library/Caches/Prova/f")
-        #expect(chmod(home.at("Library/Caches/Prova/chiusa"), 0) == 0)
-        defer { chmod(home.at("Library/Caches/Prova/chiusa"), 0o755) }
+        try home.folder("Library/Caches/Sample/locked")
+        try home.file("Library/Caches/Sample/f")
+        #expect(chmod(home.at("Library/Caches/Sample/locked"), 0) == 0)
+        defer { chmod(home.at("Library/Caches/Sample/locked"), 0o755) }
 
         let plan = try await home.plan(cacheRule)
 
         #expect(plan.roots[0].items.map(\.relativePath) == ["f"])
     }
 
-    @Test("Una cartella vuota non produce candidati")
+    @Test("An empty folder produces no candidates")
     func emptyRoot() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
+        try home.folder("Library/Caches/Sample")
         let tree = try await FileScanner().scan(root: home.path).tree
         let catalog = try RuleCatalog(rules: [cacheRule])
 
@@ -655,7 +655,7 @@ struct RuleTests {
     }
 }
 
-@Suite("Comandi")
+@Suite("Commands")
 struct CommandTests {
     private let erase = CleaningRule(
         id: "simulators.eraseall", title: "t", explanation: "e", level: .review, section: .developer,
@@ -672,7 +672,7 @@ struct CommandTests {
 
         @Sendable func run(_ executable: String, _ arguments: [String], _ timeout: Duration) -> CommandOutcome {
             calls.withLock { $0.append([executable] + arguments) }
-            return CommandOutcome(status: status, output: "uscita del comando")
+            return CommandOutcome(status: status, output: "command output")
         }
     }
 
@@ -685,7 +685,7 @@ struct CommandTests {
         )
     }
 
-    @Test("I comandi fuori dalla lista chiusa vengono rifiutati", arguments: [
+    @Test("Commands outside the closed list are refused", arguments: [
         CleanupCommand(executable: "/bin/rm", arguments: ["-rf", "/"]),
         CleanupCommand(executable: "/bin/sh", arguments: ["-c", "xcrun simctl erase all"]),
         CleanupCommand(executable: "xcrun", arguments: ["simctl", "erase", "all"]),
@@ -699,7 +699,7 @@ struct CommandTests {
         #expect(throws: RuleError.commandNotAllowed(rule: "x")) { try RuleCatalog(rules: [rule]) }
     }
 
-    @Test("La cartella dei simulatori è ammessa solo per un comando, mai per eliminare file")
+    @Test("The simulators folder is allowed only for a command, never for deleting files")
     func devicesAreCommandOnly() {
         let direct = CleaningRule(id: "x", title: "t", explanation: "e", level: .review, roots: ["~/Library/Developer/CoreSimulator/Devices"])
         #expect(throws: RuleError.rootNotAllowed(rule: "x", root: "~/Library/Developer/CoreSimulator/Devices")) {
@@ -708,7 +708,7 @@ struct CommandTests {
         #expect(throws: Never.self) { try RuleCatalog(rules: [erase]) }
     }
 
-    @Test("Le cartelle dello sviluppatore non ammesse vengono rifiutate", arguments: [
+    @Test("Developer folders that aren't allowed are refused", arguments: [
         "~/Library/Developer", "~/Library/Developer/Xcode", "~/Library/Developer/Xcode/Archives",
         "~/Library/Developer/CoreSimulator", "~/Library/Developer/Xcode/DerivedData/../Archives",
     ])
@@ -717,7 +717,7 @@ struct CommandTests {
         #expect(throws: RuleError.self) { try RuleCatalog(rules: [rule]) }
     }
 
-    @Test("Un comando esegue esattamente quanto approvato")
+    @Test("A command runs exactly what was approved")
     func runsExactCommand() async {
         let home = try! FakeHome()
         let recorder = Recorder()
@@ -730,7 +730,7 @@ struct CommandTests {
         #expect(report.issueCount == 0)
     }
 
-    @Test("Con l'app proprietaria aperta il comando non parte")
+    @Test("The command doesn't start while its owner app is open")
     func blockedByOwner() async {
         let home = try! FakeHome()
         let recorder = Recorder()
@@ -742,7 +742,7 @@ struct CommandTests {
         #expect(report.rules[0].blockedBy == ["Simulator"])
     }
 
-    @Test("Un comando costruito a mano fuori dalla lista non parte")
+    @Test("A hand-built command outside the list doesn't start")
     func handBuiltCommandIsRefused() async {
         let home = try! FakeHome()
         let recorder = Recorder()
@@ -758,7 +758,7 @@ struct CommandTests {
         #expect(report.removedItemCount == 0)
     }
 
-    @Test("Un piano con comando e file insieme viene rifiutato")
+    @Test("A plan with both a command and files is refused")
     func commandWithFilesIsRefused() async throws {
         let home = try FakeHome()
         try home.folder("Library/Developer/CoreSimulator/Devices")
@@ -779,7 +779,7 @@ struct CommandTests {
         #expect(report.issueCount == 1)
     }
 
-    @Test("Un comando fallito è riportato con il suo esito", arguments: [Int32?.some(70), nil])
+    @Test("A failed command is reported with its status", arguments: [Int32?.some(70), nil])
     func failedCommand(status: Int32?) async {
         let home = try! FakeHome()
         let plan = CleanupCandidate(rule: erase, roots: [], commandEstimate: 1)
@@ -787,10 +787,10 @@ struct CommandTests {
         let report = await executor(home, Recorder(status: status)).run([plan])
 
         #expect(report.removedItemCount == 0)
-        #expect(report.rules[0].issues.first?.problem == .commandFailed(status: status, output: "uscita del comando"))
+        #expect(report.rules[0].issues.first?.problem == .commandFailed(status: status, output: "command output"))
     }
 
-    @Test("L'annullamento impedisce di avviare il comando")
+    @Test("Cancelling prevents the command from starting")
     func cancelBeforeCommand() async {
         let home = try! FakeHome()
         let recorder = Recorder()
@@ -803,7 +803,7 @@ struct CommandTests {
         #expect(recorder.calls.withLock { $0 }.isEmpty)
     }
 
-    @Test("Il piano include un comando solo se ha qualcosa da fare")
+    @Test("The plan includes a command only when it has work to do")
     func plannerNeedsEstimate() async throws {
         let home = try FakeHome()
         try home.folder("Library")
@@ -821,7 +821,7 @@ struct CommandTests {
         #expect(found.first?.itemCount == 1)
     }
 
-    @Test("Il catalogo incluso usa solo comandi in lista e non seleziona la cancellazione dei simulatori")
+    @Test("The built-in catalog uses only listed commands and doesn't select erasing simulators")
     func builtInCommands() throws {
         let rules = try RuleCatalog.builtIn().rules
         let eraseRule = try #require(rules.first { $0.id == "simulators.eraseall" })
@@ -831,7 +831,7 @@ struct CommandTests {
         #expect(rules.filter { $0.command != nil }.count == 3)
     }
 
-    @Test("La stima di brew si legge dalla sua uscita", arguments: [
+    @Test("brew's estimate is read from its output", arguments: [
         ("==> This operation would free approximately 454.1MB of disk space.", Int64(454_100_000)),
         ("==> This operation would free approximately 1.5GB of disk space.", Int64(1_500_000_000)),
         ("==> This operation would free approximately 12KB of disk space.", Int64(12_000)),
@@ -840,19 +840,19 @@ struct CommandTests {
         #expect(DeveloperProbes.brewEstimate(fromOutput: text) == expected)
     }
 
-    @Test("Senza riga di stima, brew non ha nulla da liberare")
+    @Test("Without an estimate line, brew has nothing to free")
     func brewNothingToDo() {
-        #expect(DeveloperProbes.brewEstimate(fromOutput: "Warning: niente da fare") == nil)
+        #expect(DeveloperProbes.brewEstimate(fromOutput: "Warning: nothing to do") == nil)
     }
 
-    @Test("L'elenco dei simulatori non disponibili si legge dal JSON")
+    @Test("The list of unavailable simulators is read from JSON")
     func unavailableList() {
         let json = #"{"devices":{"r1":[{"udid":"B","name":"x"},{"udid":"A","name":"y"}],"r2":[]}}"#
         #expect(DeveloperProbes.unavailableDeviceIDs(fromJSON: json) == ["A", "B"])
-        #expect(DeveloperProbes.unavailableDeviceIDs(fromJSON: "non json").isEmpty)
+        #expect(DeveloperProbes.unavailableDeviceIDs(fromJSON: "not json").isEmpty)
     }
 
-    @Test("Le versioni vecchie di brew escludono quanto copre già la regola della cache")
+    @Test("Old brew versions exclude what the cache rule already covers")
     func brewBeyondCache() throws {
         let catalog = try RuleCatalog(rules: [CleaningRule(
             id: "homebrew.oldversions", title: "t", explanation: "e", level: .review,
@@ -864,27 +864,27 @@ struct CommandTests {
                 CommandOutcome(status: 0, output: "would free approximately 500MB of disk space")
             })
         }
-        // Serve brew installato: altrimenti la regola non si applica e il test non dice nulla.
+        // Needs brew installed: otherwise the rule doesn't apply and the test says nothing.
         try #require(FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/brew"))
 
         #expect(estimates(cache: 500_000_000).isEmpty)
         #expect(estimates(cache: 100_000_000) == ["homebrew.oldversions": 400_000_000])
     }
 
-    @Test("Il runner riporta l'esito di un programma vero")
+    @Test("The runner reports a real program's status")
     func runnerReportsStatus() {
         #expect(CommandRunner.run(executable: "/usr/bin/true", arguments: [], timeout: .seconds(5)).status == 0)
         #expect(CommandRunner.run(executable: "/usr/bin/false", arguments: [], timeout: .seconds(5)).status == 1)
         #expect(CommandRunner.run(executable: "/percorso/inesistente", arguments: [], timeout: .seconds(5)).status == nil)
     }
 
-    @Test("Il runner non interpreta gli argomenti come una shell")
+    @Test("The runner doesn't interpret arguments like a shell")
     func noShell() {
         let outcome = CommandRunner.run(executable: "/bin/echo", arguments: ["$HOME; rm -rf /"], timeout: .seconds(5))
         #expect(outcome.output.trimmingCharacters(in: .newlines) == "$HOME; rm -rf /")
     }
 
-    @Test("Il runner ferma un comando che supera il tempo")
+    @Test("The runner stops a command that runs out of time")
     func timeout() {
         let start = ContinuousClock.now
         let outcome = CommandRunner.run(executable: "/bin/sleep", arguments: ["30"], timeout: .milliseconds(200))
@@ -892,7 +892,7 @@ struct CommandTests {
         #expect(start.duration(to: .now) < .seconds(5))
     }
 
-    @Test("Il runner regge un'uscita molto lunga senza bloccarsi")
+    @Test("The runner copes with very long output without blocking")
     func longOutput() {
         let outcome = CommandRunner.run(executable: "/usr/bin/yes", arguments: [], timeout: .milliseconds(300))
         #expect(outcome.status == nil)
@@ -900,16 +900,16 @@ struct CommandTests {
     }
 }
 
-@Suite("Cronologia")
+@Suite("History")
 struct HistoryTests {
     private func report(id: UUID = UUID(), freed: Int64) -> CleanupReport {
         CleanupReport(id: id, date: .now, rules: [], measuredFreed: freed, wasCancelled: false)
     }
 
-    @Test("Le voci si accumulano, la più recente per prima")
+    @Test("Entries add up, most recent first")
     func appendAndLoad() throws {
         let home = try FakeHome()
-        let history = CleanupHistory(file: URL(fileURLWithPath: home.at("sotto/storia.jsonl")))
+        let history = CleanupHistory(file: URL(fileURLWithPath: home.at("sub/history.jsonl")))
 
         #expect(history.load().isEmpty)
         try history.append(report(freed: 1))
@@ -918,63 +918,63 @@ struct HistoryTests {
         #expect(history.load().map(\.measuredFreed) == [2, 1])
     }
 
-    @Test("Una riga danneggiata costa solo quella voce")
+    @Test("A damaged line costs only that entry")
     func damagedLine() throws {
         let home = try FakeHome()
-        let url = URL(fileURLWithPath: home.at("storia.jsonl"))
+        let url = URL(fileURLWithPath: home.at("history.jsonl"))
         let history = CleanupHistory(file: url)
         try history.append(report(freed: 1))
 
         let handle = try FileHandle(forWritingTo: url)
         try handle.seekToEnd()
-        try handle.write(contentsOf: Data("{non valido\n".utf8))
+        try handle.write(contentsOf: Data("{not valid\n".utf8))
         try handle.close()
         try history.append(report(freed: 2))
 
         #expect(history.load().map(\.measuredFreed) == [2, 1])
     }
 
-    @Test("Un'eliminazione reale produce una voce completa")
+    @Test("A real removal produces a complete entry")
     func roundTrip() async throws {
         let home = try FakeHome()
-        try home.folder("Library/Caches/Prova")
-        try home.file("Library/Caches/Prova/f")
-        let history = CleanupHistory(file: URL(fileURLWithPath: home.at("storia.jsonl")))
+        try home.folder("Library/Caches/Sample")
+        try home.file("Library/Caches/Sample/f")
+        let history = CleanupHistory(file: URL(fileURLWithPath: home.at("history.jsonl")))
 
         try history.append(await home.executor().run([try await home.plan(cacheRule)]))
 
         let saved = try #require(history.load().first)
-        #expect(saved.rules[0].removedItems == [home.at("Library/Caches/Prova/f")])
+        #expect(saved.rules[0].removedItems == [home.at("Library/Caches/Sample/f")])
         #expect(saved.rules[0].ruleID == "test.cache")
     }
 }
 
-@Suite("Processi")
+@Suite("Processes")
 struct ProcessTests {
-    @Test("L'elenco dei processi contiene launchd")
+    @Test("The process list contains launchd")
     func listsProcesses() {
         #expect(RunningProcesses.names().contains("launchd"))
     }
 }
 
-@Suite("Percorsi reali, in sola lettura")
+@Suite("Real paths, read-only")
 struct RealPathTests {
     /// The real home goes through firmlinks. Opening without following links must still
     /// work there, or the app could never clean anything. Nothing is removed.
-    @Test("La cartella Library reale si apre senza seguire link")
+    @Test("The real Library folder opens without following links")
     func realHomeOpens() throws {
         let path = NSHomeDirectory() + "/Library"
         guard case .success(let descriptor) = SafeRemover.openDirectory(atAbsolutePath: path) else {
-            Issue.record("impossibile aprire \(path)")
+            Issue.record("could not open \(path)")
             return
         }
         close(descriptor)
     }
 
-    @Test("Il percorso con /tmp, che è un link simbolico, viene rifiutato")
+    @Test("A path through /tmp, which is a symbolic link, is refused")
     func systemSymlinkIsRefused() {
         guard case .failure(let problem) = SafeRemover.openDirectory(atAbsolutePath: "/tmp") else {
-            Issue.record("/tmp è stato seguito")
+            Issue.record("/tmp was followed")
             return
         }
         #expect(problem == .symbolicLinkInPath)
@@ -994,7 +994,7 @@ extension FakeHome {
     /// Builds a plan by hand for a root that doesn't exist on disk yet.
     func plan(_ rule: CleaningRule, ifExists: Bool, stub name: String) async throws -> CleanupCandidate {
         CleanupCandidate(rule: rule, roots: [
-            PlanRoot(path: at("Library/Caches/Prova"), fileID: 1, items: [
+            PlanRoot(path: at("Library/Caches/Sample"), fileID: 1, items: [
                 PlanItem(relativePath: name, fileID: 1, allocated: 1, privateBytes: 1),
             ]),
         ])

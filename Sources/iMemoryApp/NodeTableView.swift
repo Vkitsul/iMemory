@@ -45,7 +45,7 @@ struct NodeTableView: NSViewRepresentable {
         table.doubleAction = #selector(Coordinator.openClickedRow)
 
         let menu = NSMenu()
-        let reveal = NSMenuItem(title: "Mostra nel Finder", action: #selector(Coordinator.revealClickedRow), keyEquivalent: "")
+        let reveal = NSMenuItem(title: "Show in Finder", action: #selector(Coordinator.revealClickedRow), keyEquivalent: "")
         reveal.target = context.coordinator
         menu.addItem(reveal)
         table.menu = menu
@@ -69,10 +69,10 @@ struct NodeTableView: NSViewRepresentable {
 
         var title: String {
             switch self {
-            case .name: "Nome"
-            case .size: "Spazio"
-            case .modified: "Modificato"
-            case .items: "Elementi"
+            case .name: "Name"
+            case .size: "Size"
+            case .modified: "Modified"
+            case .items: "Items"
             }
         }
 

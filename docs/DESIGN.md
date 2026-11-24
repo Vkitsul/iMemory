@@ -1,290 +1,269 @@
-# iMemory: documento di progetto
+# iMemory: design document
 
-App nativa per macOS che mostra dove finisce lo spazio su disco e aiuta a liberarlo senza rischi.
+A native macOS app that shows where disk space goes and helps free it without risk.
 
-Stato al 5 novembre 2026: M0 completata. Tutte le tappe, da M1 a M5, sono scritte e verificate con test e con un giro automatico: mancano la prova con mouse e tastiera reali e la prima pulizia sui dati veri, che spetta all'utente.
+Status: every milestone, M0 to M5, is written and verified with automated tests and a scripted run of the app. It has not yet been used with a real mouse and keyboard, nor for a real cleanup.
 
-Destinazione: solo uso personale, su questo Mac con macOS 27. Non è prevista la pubblicazione.
+Scope: a personal project for macOS 27, published as is. It isn't notarized or distributed as a binary.
 
-## 1. Cosa dicono i numeri di questo Mac
+## 1. What the measurements showed
 
-Misure di sola lettura del 5 novembre 2026, in GB decimali come nel Finder. Sul disco da 245,1 GB sono occupati 192,5 GB, così divisi:
+The design comes from measuring a real Mac before writing any code. The exact figures depend on the machine, but three findings shaped the app:
 
-| Volume APFS | Spazio | Nota |
-|---|---:|---|
-| Dati | 143,5 | vedi sotto |
-| Preboot | 20,6 | di sistema, non si tocca |
-| Sistema | 18,4 | sigillato, non si tocca |
-| VM | 5,4 | memoria virtuale, la gestisce macOS |
-| Recovery | 3,1 | di sistema, non si tocca |
-| Update | 1,3 | di sistema, non si tocca |
+1. **Emptying caches gives back little.** On the development machine, caches were under 2% of the used space, and most of them come back anyway. An app that only clears caches wouldn't solve the problem.
+2. **The value is in understanding.** Most of the space sat in app data, photo libraries, device backups, and folders that need Full Disk Access to read, not in documents. So the main feature is exploring, with cleaning right beside it.
+3. **The same folder has several sizes.** `/Applications` measured about 32 GB logical, 26 GB allocated, and 21 GB private. Showing the wrong figure means promising space that won't come back.
 
-Dentro il volume Dati, con Accesso completo al disco:
+Other findings:
 
-| Cartella | Spazio | Nota |
-|---|---:|---|
-| `/Users` | 74,7 | di cui `~/Library` 58,4 |
-| `~/Library/Application Support` | 39,5 | compreso in `/Users`; Claude 11,6, backup di iPhone 7,2, Steam 3,8 |
-| `~/Pictures` | 10,5 | compreso in `/Users`; quasi tutto libreria Foto |
-| `~/Library/Developer` | 7,5 | compreso in `/Users`; quasi tutto simulatori (7,4) |
-| `~/Library/Caches` | 3,4 | compreso in `/Users`; Brave 2,0, Homebrew 0,5 (misurato senza Accesso completo al disco) |
-| `/Applications` | 25,8 | |
-| `/System/Library/AssetsV2` | 16,3 | di cui runtime del simulatore iOS 8,1 |
-| `/private` | 10,3 | |
-| `/Library` | 6,6 | |
-| **Non attribuito** | **fra 8,5 e 22** | i 143,7 del volume meno i 135,2 allocati o i 121,8 privati |
+- **Full Disk Access matters.** Without it, hundreds of folders in the home can't be read, and over a fifth of the used space went unexplained.
+- **Some space can't be attributed.** Even with Full Disk Access, a few GB stay in folders that need root, or in APFS metadata. Because APFS clones count several times in an allocated total, the unattributed space is a range: the app shows its lower bound and says so.
+- **The system volumes take tens of GB** (System, Preboot, Recovery, VM). macOS manages them and the app doesn't touch them.
 
-Dando l'Accesso completo al disco, lo spazio misurato sale da 105,8 a 135,2 GB e le cartelle illeggibili scendono da 898 a 239. Quelle rimaste sono soprattutto di sistema (per esempio in `/private/var`) e richiedono root. Lo spazio non attribuito è un intervallo perché i cloni APFS contano più volte nel totale allocato: lo spazio fisico delle cartelle misurate sta fra 121,8 e 135,2 GB. Può trovarsi nelle cartelle che richiedono root o nei metadati di APFS, ma non è verificato. L'app mostra il valore minimo e lo dichiara come tale.
+## 2. Principles
 
-Tre conseguenze guidano il progetto:
+1. **Nothing is deleted without a preview.** The exact list is always shown before acting.
+2. **Honest numbers.** Freed space is measured on the volume after the operation, not estimated. Moving to the Trash doesn't count as freed.
+3. **Every item explains itself.** What it is, who creates it, what happens if you delete it, whether it comes back.
+4. **No scaremongering.** No health score, no invented "danger", no RAM cleaning.
+5. **Works offline.** No information about your files leaves the Mac.
 
-1. **Svuotare le cache rende poco.** Sono 3,4 GB su 192,5, e in gran parte si ricreano. Un'app che fa solo pulizia cache non risolverebbe il problema.
-2. **Il valore sta nel capire.** Lo spazio sta soprattutto nei dati delle app, in Foto e nei backup, non nei documenti: fuori da `~/Library` la cartella utente occupa 15,4 GB, di cui 10,5 sono immagini. Per questo la funzione principale è l'esplorazione, con la pulizia subito accanto.
-3. **Una stessa cartella ha più dimensioni.** `/Applications` vale 32,3 GB logici, 25,8 allocati e 21,3 privati. Mostrare il numero sbagliato significa promettere spazio che non si libera.
+### Deliberately out of scope
 
-## 2. Principi
+- **RAM cleaning.** macOS already manages memory, and forcing it empty slows the system down, because it has to reload what it had cached.
+- **Deleting files protected by SIP**, or changing anything in `/System`.
+- **System snapshots.** `com.apple.os.update` snapshots belong to software updates: they're shown and never touched.
 
-1. **Nessuna cancellazione senza anteprima.** Si vede sempre l'elenco esatto prima di agire.
-2. **Numeri onesti.** Lo spazio liberato è misurato sul volume dopo l'operazione, non stimato. Spostare nel Cestino non conta come liberato.
-3. **Ogni voce spiega se stessa.** Cos'è, chi la crea, cosa succede se la elimini, se si ricrea.
-4. **Niente allarmismi.** Nessun punteggio di salute, nessun "pericolo" inventato, nessuna pulizia della RAM.
-5. **Funziona senza rete.** Nessun dato sui file lascia il Mac.
+## 3. Features
 
-### Fuori ambito, di proposito
+| Section | What it does |
+|---|---|
+| Overview | Space by category, largest folders, what grew since the last scan, suggested actions |
+| Explore | A treemap and a list you can navigate, with filters by kind, age, and size |
+| Apps | Size, the space that really comes back, last use when known, uninstalling with leftovers |
+| Large files | Files over 100 MB outside the Library, hidden folders, and packages, filtered by kind and age |
+| Duplicates | Real copies, leaving out APFS clones, which don't take space twice. At least one copy always stays |
+| Cleanup | Caches and old logs, driven by rules and grouped by risk level |
+| Developer | Simulators, DerivedData, device support, Homebrew, pip, npm |
+| History | Every operation with its files, measured space, and outcome |
+| Automation | Menu bar icon, low space warning, scheduled cleanups of safe items only, off by default |
 
-- **Pulizia della RAM.** macOS gestisce già la memoria, e svuotarla a forza rallenta il sistema perché deve ricaricare ciò che aveva in cache.
-- **Cancellazione di file protetti da SIP** e modifiche a `/System`.
-- **Snapshot di sistema.** Su questo Mac ci sono solo snapshot `com.apple.os.update`, di proprietà degli aggiornamenti: si mostrano e non si toccano.
+The feature that sets the app apart most is **"what grew"**: comparing saved scans shows at once that a folder took 12 GB this week.
 
-## 3. Funzioni
+## 4. Cleaning safely
 
-| Sezione | Cosa fa | Versione |
-|---|---|---|
-| Panoramica | Spazio per categoria, cartelle più grandi, cosa è cresciuto dall'ultima scansione, azioni consigliate | 1.0 |
-| Esplora | Treemap ed elenco navigabili, con filtri per tipo, età e dimensione | 1.0 |
-| Pulizia | Cache e log vecchi, guidati da regole e raggruppati per livello di rischio. I residui delle app arrivano con la sezione App | 1.0 |
-| Sviluppatore | Simulatori, DerivedData, supporto dispositivi, Homebrew, pip, npm. `node_modules` e Docker non sono inclusi: su questo Mac non ci sono, quindi non si potrebbero provare | 1.0 |
-| App | Dimensione, spazio che torna davvero, ultimo utilizzo se noto, disinstallazione con residui | 1.1 |
-| File grandi e vecchi | File oltre 100 MB fuori da Libreria, cartelle nascoste e pacchetti, filtrabili per tipo ed età | 1.1 |
-| Duplicati | Copie vere, escludendo i cloni APFS che non occupano spazio doppio. Almeno una copia resta sempre | 1.2 |
-| Automazione | Icona nella barra dei menu, avviso di spazio basso, pulizie programmate delle sole voci sicure, disattivate di partenza | 1.3 |
-| Cronologia | Ogni operazione con file, spazio misurato ed esito | 1.0 |
+Every item belongs to one of four levels.
 
-La funzione che distingue di più l'app è **"cosa è cresciuto"**: confrontando le scansioni salvate si vede subito che una cartella ha preso 12 GB questa settimana.
-
-## 4. Sicurezza della pulizia
-
-Ogni voce appartiene a uno di quattro livelli.
-
-| Livello | Esempi | Selezione predefinita | Come si elimina |
+| Level | Examples | Selected by default | How it's removed |
 |---|---|---|---|
-| Sicuro | Cache di Homebrew, pip e npm, log non modificati da 30 giorni | Sì | Eliminazione diretta |
-| Da valutare | Cache del browser e di Steam, DerivedData, dati dei simulatori | No | Eliminazione diretta, oppure comando dello strumento |
-| Personale | App, residui, file grandi, duplicati | No, mai: li sceglie l'utente | Cestino |
-| Protetto | Portachiavi, `Application Support` senza regola, dati di sistema | Non selezionabile | Mai |
+| Safe | Homebrew, pip, and npm caches, logs untouched for 30 days | Yes | Deleted directly |
+| Review first | Browser and Steam caches, DerivedData, simulator data | No | Deleted directly, or by the tool's own command |
+| Personal | Apps, leftovers, large files, duplicates | Never: you pick them | Moved to the Trash |
+| Protected | Keychains, `Application Support` without a rule, system data | Can't be selected | Never |
 
-Nelle cache il Cestino non servirebbe: lo spazio resterebbe occupato finché non viene svuotato.
+For caches the Trash would be pointless: the space would stay used until it's emptied.
 
-`Application Support` è protetto per impostazione predefinita, anche se pesa molto, perché contiene dati veri mescolati alle cache. Si interviene solo su sottocartelle coperte da una regola esplicita.
+`Application Support` is protected by default, even though it's large, because real data is mixed in with caches. Only subfolders covered by an explicit rule are touched.
 
-### Percorso di ogni eliminazione
+### Path of every removal
 
-Il codice è in `Sources/CleanKit`, l'unico modulo che può modificare il disco.
+The code is in `Sources/CleanKit`, the only module allowed to change the disk.
 
-1. **Piano.** Elenco immutabile di voci con regola, identificativo del file e dimensione attesa, mostrato prima di agire.
-2. **Controlli subito prima di agire:**
-   - la regola è ancora valida e le radici del piano sono quelle che nomina
-   - le app proprietarie non sono aperte (controllo ripetuto per ogni regola)
-   - la radice si apre un componente alla volta, senza seguire link, e ha lo stesso identificativo della scansione
-   - ogni voce ha lo stesso identificativo della scansione, altrimenti si salta
-3. **Esecuzione.** Ogni passaggio apre un solo componente relativo a una cartella già aperta e rifiuta i link. Un link messo ovunque, anche durante l'eliminazione, non può portarla fuori dalla sua cartella. Non attraversa altri volumi e non scarica file dal cloud. Le voci comparse dopo la scansione restano.
-4. **Verifica.** Si legge lo spazio del volume subito prima e subito dopo, senza attese, e il risultato va in Cronologia. APFS libera lo spazio all'istante, mentre aspettare lascia entrare nella misura ciò che scrivono le altre app: in una prova, 12 MB al secondo di scritture altrui hanno ridotto 400 MB a 143 in 20 secondi. Se il dato misurato e i byte dei file eliminati divergono, il report li mostra entrambi.
+1. **Plan.** An immutable list of items, each with its rule, file identifier, and expected size, shown before acting.
+2. **Checks right before acting:**
+   - the rule is still valid, and the plan's roots are the ones it names
+   - the owner apps aren't open (checked again for each rule)
+   - the root is opened one component at a time, without following links, and has the same identifier as in the scan
+   - every item has the same identifier as in the scan, or it's skipped
+3. **Removal.** Each step opens a single component relative to a folder already open, and refuses links. A link planted anywhere, even during the removal, can't take it outside its folder. It doesn't cross into other volumes and doesn't download files from the cloud. Items that appeared after the scan stay.
+4. **Verification.** The volume's used space is read right before and right after, without waiting, and the result goes to History. APFS frees space at once, while waiting lets other apps' writes into the figure: in one test, 12 MB per second of writes by other apps turned 400 MB into 143 MB within 20 seconds. If the measured figure and the bytes of the removed files diverge, the report shows both.
 
-### Spostamento nel Cestino
+### Moving to the Trash
 
-App, residui e file personali vanno sempre nel Cestino, da cui si recuperano. Il report lo dichiara: lo spazio si libera solo svuotandolo, e l'app non lo svuota. `TrashPolicy` ammette solo:
+Apps, leftovers, and personal files always go to the Trash, where they can be recovered. The report says so: the space is freed only when the Trash is emptied, and the app doesn't empty it. `TrashPolicy` allows only:
 
-- **app:** un bundle `.app` nelle cartelle delle app, al massimo una sottocartella più in basso
-- **residui:** figli diretti di cartelle note di `~/Library`, mai la cartella stessa, e mai ad esempio `Keychains` o `Mail`
-- **file:** file normali nella Home, fuori da `~/Library`, da cartelle nascoste come `.git` e dall'interno dei pacchetti come la libreria Foto
+- **apps:** a `.app` bundle in the app folders, at most one subfolder down
+- **leftovers:** direct children of known `~/Library` folders, never the folder itself, and never `Keychains` or `Mail`, for example
+- **files:** regular files in the home, outside `~/Library`, hidden folders such as `.git`, and the inside of packages such as the Photos library
 
-Prima di spostare ogni voce si riapre il percorso senza seguire link e si confronta l'identificativo con la scansione. Se l'app è aperta non si sposta nulla. Se il sistema rifiuta, ad esempio per un'app di proprietà di root come Xcode, l'errore finisce nel report senza chiedere privilegi: si sposta dal Finder.
+Before moving each item, the path is opened again without following links and its identifier is compared with the scan. Nothing moves while the app is open. If the system refuses, for example for a root-owned app such as Xcode, the error goes in the report without asking for privileges: move it from the Finder.
 
-**Residui.** Quanto è trovato per identificativo esatto e non è dati dell'app parte selezionato. I dati dell'app, che possono contenere lavoro dell'utente, e quanto è trovato solo per nome partono sempre non selezionati.
+**Leftovers.** What's found by exact bundle identifier and isn't app data starts selected. App data, which may hold your work, and anything found by name only always start unselected.
 
-**Ultimo utilizzo.** Viene da Spotlight, che lo conosce per 11 app su 53 su questo Mac. Quando manca l'app scrive "non noto", mai "mai usata".
+**Last use.** It comes from Spotlight, which knew it for only about one app in five on the development machine. When it's missing, the app says "unknown", never "never used".
 
-### Duplicati
+### Duplicates
 
-`DuplicateKit` confronta i file oltre 1 MB nella Home, con le stesse esclusioni dei file grandi, a costo crescente: stessa dimensione, stesso inizio e fine, poi SHA-256 dell'intero contenuto. Non scarica file dal cloud. La ricerca parte solo su richiesta, perché legge i file.
+`DuplicateKit` compares files over 1 MB in the home, with the same exclusions as large files, at rising cost: same size, same start and end, then SHA-256 of the whole content. It doesn't download files from the cloud. The search runs only when asked, because it reads files.
 
-- **Cloni:** file che condividono lo stesso clone contano come una sola copia. Un gruppo fatto solo di cloni non compare.
-- **Selezione:** nessun file parte selezionato, e `DuplicateSelection` rifiuta di togliere tutte le copie di un gruppo.
-- **Copia da tenere:** al momento di spostare si verifica che esista ancora e sia la stessa della scansione, altrimenti non si sposta nulla.
+- **Clones:** files sharing the same clone count as a single copy. A group made only of clones doesn't appear.
+- **Selection:** no file starts selected, and `DuplicateSelection` refuses to remove every copy in a group.
+- **Copy to keep:** when moving, the app checks that it still exists and is the one scanned. Otherwise nothing moves.
 
-### Pulizie programmate
+### Scheduled cleanups
 
-Sono l'unica eccezione al principio «nessuna cancellazione senza anteprima», quindi hanno limiti stretti:
+They're the only exception to "nothing is deleted without a preview", so their limits are strict:
 
-- sono **disattivate di partenza**, e un file di impostazioni assente o danneggiato le lascia spente
-- riguardano solo voci «Sicuro» che eliminano file: mai comandi, app, file personali o voci da valutare
-- la prima avviene dopo un intero intervallo dall'attivazione, e la schermata elenca cosa eliminerebbe adesso
-- ogni esecuzione finisce in Cronologia, segnata come programmata
-- girano solo mentre l'app è aperta: l'avvio al login non c'è, e servirebbe prima un certificato stabile
+- they're **off by default**, and a missing or damaged settings file leaves them off
+- they cover only "Safe" items that delete files: never commands, apps, personal files, or items to review
+- the first one runs a full interval after they're turned on, and the screen lists what they would delete now
+- every run goes to History, marked as scheduled
+- they run only while the app is open: there's no launch at login
 
-### Regole come dati
+### Rules as data
 
-Le regole stanno in `Sources/RulesKit/catalog.json`, compilato nell'app, così si possono rivedere senza toccare il motore:
+Rules live in `Sources/RulesKit/catalog.json`, compiled into the app, so they can be reviewed without touching the engine:
 
 ```json
 {
   "id": "homebrew.cache",
-  "title": "Cache di Homebrew",
-  "explanation": "Pacchetti già scaricati. Homebrew li riscarica se servono.",
+  "title": "Homebrew cache",
+  "explanation": "Packages already downloaded. Homebrew downloads them again when needed.",
   "level": "safe",
   "roots": ["~/Library/Caches/Homebrew"],
   "ownerProcesses": []
 }
 ```
 
-Una regola può nominare solo cartelle ammesse da una lista scritta nel codice (`RootPolicy`): sottocartelle di `~/Library/Caches` e `~/.npm`, più `~/Library/Logs`. Un errore nel catalogo può quindi puntare al massimo a un'altra cache, mai a documenti o a `Application Support`, e un catalogo con una regola non valida viene rifiutato per intero. Le prossime tappe allargheranno questa lista solo dove serve.
+A rule can only name folders allowed by a list written in code (`RootPolicy`): subfolders of `~/Library/Caches` and `~/.npm`, `~/Library/Logs`, and two Xcode folders. A mistake in the catalog can at worst point at another cache, never at documents or `Application Support`, and a catalog with an invalid rule is refused as a whole.
 
-Anche i comandi degli strumenti stanno in una lista chiusa nel codice (`CommandPolicy`), scritti per intero con percorso assoluto: `xcrun simctl delete unavailable`, `xcrun simctl erase all`, `brew cleanup --prune=all`. Partono senza shell, quindi nulla negli argomenti può essere interpretato, e con un limite di tempo. La cartella dei simulatori è ammessa solo per un comando, mai per l'eliminazione diretta.
+Tool commands are a closed list in code too (`CommandPolicy`), written in full with absolute paths: `xcrun simctl delete unavailable`, `xcrun simctl erase all`, `brew cleanup --prune=all`. They run without a shell, so nothing in the arguments can be interpreted, and with a time limit. The simulators folder is allowed only for a command, never for direct removal.
 
-Un comando compare solo se ha qualcosa da fare: lo si chiede allo strumento in sola lettura (`simctl list`, `brew cleanup --dry-run`). Per un comando la stima è un massimo, «fino a», perché ciò che libera davvero lo decide lo strumento. La cache di Homebrew resta una regola a sé, così si vede il dettaglio delle voci; il comando compare solo se c'è altro oltre la cache.
+A command appears only when it has work to do: the tool is asked in read-only mode (`simctl list`, `brew cleanup --dry-run`). For a command the estimate is a maximum, "up to", because what it really frees is up to the tool. The Homebrew cache stays a rule of its own, so its items can be seen one by one; the command appears only when there's more than the cache.
 
-## 5. Architettura
+## 5. Architecture
 
-**Stack:** Swift 6 e SwiftUI, AppKit dove serve, moduli SwiftPM e nessuna dipendenza esterna per il motore. Sul Mac ci sono già Xcode 27.2 e Swift 6.4.
+**Stack:** Swift 6 and SwiftUI, AppKit where needed, SwiftPM modules, and no external dependencies. Built with Xcode 27.2 and Swift 6.4.
 
 ```
 iMemoryApp (SwiftUI)
-   ├── ScanKit       scansione, albero in memoria, scansioni salvate
-   ├── RulesKit      catalogo regole e classificazione
-   ├── CleanKit      piano, controlli, esecuzione, cronologia
-   ├── DuplicateKit  dimensione → hash parziale → hash completo
-   └── AppsKit       app installate, residui, ultimo utilizzo
+   ├── ScanKit       scanning, in-memory tree, saved scans, recovery estimates
+   ├── RulesKit      rule catalog and planning
+   ├── CleanKit      checks, removal, commands, Trash, history, automation rules
+   ├── DuplicateKit  size → partial hash → full hash
+   └── AppsKit       installed apps, leftovers, large files
 ```
 
-Solo `CleanKit` può modificare il disco. Gli altri moduli sono di sola lettura, e questo confine rende la parte rischiosa piccola e testabile.
+Only `CleanKit` can change the disk. The other modules are read-only, and that boundary keeps the risky part small and testable.
 
-### Scansione
+### Scanning
 
-Il motore è in `Sources/ScanKit`, la CLI è `imemory-scan`, il confronto con `du` è `Scripts/compare-du.sh`. La prova iniziale resta in `Spikes/ScanSpike`.
+The engine is in `Sources/ScanKit`, the command-line tool is `imemory-scan`, and the comparison with `du` is `Scripts/compare-du.sh`. The first prototype stays in `Spikes/ScanSpike`.
 
-**Scelta: `getattrlistbulk`**, per precisione:
+**Choice: `getattrlistbulk`**, for accuracy:
 
-- riconosce gli hard link tramite l'identificativo del file, mentre `FileManager` li conta più volte (44 MiB di troppo nelle cache)
-- legge `ATTR_CMNEXT_PRIVATESIZE`, necessario per stimare lo spazio davvero recuperabile
+- it recognizes hard links by file identifier, while `FileManager` counts them several times (44 MiB too many in a caches folder, in one test)
+- it reads `ATTR_CMNEXT_PRIVATESIZE`, needed to estimate the space that really comes back
 
-**Risultati sul volume Dati**, con 1,03 milioni di voci e senza Accesso completo al disco:
+**Results on the data volume** of the development machine, with about 1 million entries and without Full Disk Access:
 
-| Thread | Tempo | Tempo di sistema | Picco di memoria |
+| Threads | Time | System time | Peak memory |
 |---:|---:|---:|---:|
-| 1 | 37,6 s | 11,6 s | 220 MB |
-| 2 | 21,8 s | 13,2 s | 216 MB |
-| **4 (predefinito)** | **13,4 s** | **14,9 s** | **195 MB** |
-| 8 | 11,9 s | 22,7 s | 202 MB |
+| 1 | 37.6 s | 11.6 s | 220 MB |
+| 2 | 21.8 s | 13.2 s | 216 MB |
+| **4 (default)** | **13.4 s** | **14.9 s** | **195 MB** |
+| 8 | 11.9 s | 22.7 s | 202 MB |
 
-Sono tempi a cache calda. Con 8 thread si guadagna l'11% di tempo ma costa il 52% in più di CPU di sistema, quindi il predefinito è 4.
+These are warm-cache times. With 8 threads the scan is 11% faster but uses 52% more system CPU, so the default is 4.
 
-**Con Accesso completo al disco**, 1,25 milioni di voci e 4 thread:
+**With Full Disk Access**, about 1.25 million entries and 4 threads:
 
-| Misura | Tempo | Picco di memoria |
+| Measurement | Time | Peak memory |
 |---|---:|---:|
-| Dopo `sudo purge` | 14,9 s | 252 MB |
-| A caldo | 14,7 s | 251 MB |
+| After `sudo purge` | 14.9 s | 252 MB |
+| Warm | 14.7 s | 251 MB |
 
-I due tempi sono quasi uguali, quindi `purge` potrebbe non svuotare i metadati del file system. Il vero caso a freddo, subito dopo il riavvio, non è stato misurato.
+The two times are almost the same, so `purge` may not evict file system metadata. A truly cold run, right after a restart, wasn't measured.
 
-**Confronto con `du`:** eseguendo scansione, `du` e di nuovo scansione, il totale di `du` cade fra le due scansioni in tutte e tre le prove, compresa quella con Accesso completo al disco. Le due scansioni differiscono di 1-2 MiB su 126 GiB perché il disco è in uso, soprattutto in `/private/var`, quindi la verifica non può essere più precisa di così.
+**Comparison with `du`:** running a scan, `du`, and a scan again, the `du` total fell between the two scans in all three tests, including the one with Full Disk Access. The two scans differ by 1–2 MiB over about 126 GiB because the disk is in use, mostly in `/private/var`, so the check can't be more precise than that.
 
-**Differenze note rispetto a `du`:**
+**Known differences from `du`:**
 
-- oltre `PATH_MAX` `du` si ferma con un errore e riporta 0, mentre il motore legge il file
-- il punto di montaggio `/home` pesa 1 KiB per `du` e 0 per il motore
-- un hard link può finire in una cartella diversa, con lo stesso totale: `du` lo attribuisce al primo percorso incontrato, il motore sempre al percorso minore (esempio: 72 KiB del binario di Brave, con un secondo link in `/private/var/folders`)
-- `du` può far scaricare le cartelle cloud per elencarle, quindi lo script le esclude da entrambe le misure
+- beyond `PATH_MAX`, `du` stops with an error and reports 0, while the engine reads the file
+- the `/home` mount point weighs 1 KiB for `du` and 0 for the engine
+- a hard link can land in a different folder with the same total: `du` gives it to the first path it meets, the engine always to the smallest path
+- `du` may download cloud folders to list them, so the script leaves them out of both measurements
 
-Altri punti del motore:
+Other points about the engine:
 
-- **Tre dimensioni per ogni nodo:** logica, allocata, privata. La UI mostra quella allocata; le stime di recupero usano la privata.
-- **Stima di recupero.** La somma dei privati è un minimo: due cloni nella stessa cartella risultano entrambi "condivisi", ma eliminandoli insieme si libera il loro spazio. Per le app `RecoveryEstimator` legge `ATTR_CMNEXT_CLONEID` e `ATTR_CMNEXT_CLONE_REFCNT`, e conta lo spazio condiviso solo se tutti i file che lo condividono sono nell'insieme. Coincide con lo spazio davvero liberato entro 10 MB nei test su 150 MB. Su questo Mac Xcode occupa 4,24 GB, ma disinstallandola ne tornano 1,26.
-- **Hard link deterministici:** il proprietario è il percorso minore, così due scansioni non mostrano crescite inesistenti.
-- **File solo nel cloud:** non vengono mai scaricati. Verificato su Google Drive, OneDrive e iCloud: 396 file e 12 cartelle riconosciuti, spazio identico prima e dopo la scansione.
-- **Altri volumi:** la radice è `/System/Volumes/Data` e la scansione non attraversa altri dispositivi, per non contare due volte i firmlink.
-- **Memoria:** l'albero occupa 106 MB per 1,25 milioni di voci, entro l'obiettivo di 150 MB. Il picco temporaneo durante la scansione è di 252 MB per circa 15 secondi, accettabile su questo Mac con 8 GB; si può ridurre se in M1 diventasse un problema.
+- **Three sizes per node:** logical, allocated, private. The UI shows allocated; recovery estimates use private.
+- **Recovery estimate.** The sum of private sizes is a lower bound: two clones in the same folder both count as "shared", yet deleting both frees their space. For apps, `RecoveryEstimator` reads `ATTR_CMNEXT_CLONEID` and `ATTR_CMNEXT_CLONE_REFCNT`, and counts shared space only when every file sharing it is in the set. It matched the space really freed within 10 MB in tests of 150 MB. On the development machine, Xcode took 4.2 GB, but uninstalling it would give back only 1.3 GB.
+- **Deterministic hard links:** the owner is the smallest path, so two scans never show growth that didn't happen.
+- **Cloud-only files:** never downloaded. Checked on Google Drive, OneDrive, and iCloud: the space used was identical before and after a scan.
+- **Other volumes:** the root is `/System/Volumes/Data`, and the scan doesn't cross into other devices, so firmlinks aren't counted twice.
+- **Memory:** the tree takes 106 MB for 1.25 million entries. The temporary peak during a scan is about 250 MB for about 15 seconds.
 
-Da fare nelle tappe successive: aggiornamenti incrementali con FSEvents e scansioni salvate per il confronto nel tempo.
+### Stalled scans
 
-### Scansioni bloccate
+While macOS waits for an answer to a permission request, `open()` blocks. After 8 seconds without new entries the app says so, and Cancel still works: the wait ends at once and the blocked thread finishes by itself once the system releases it. With ad hoc signing every build counts as a new app, so these requests can come back.
 
-Mentre macOS aspetta la risposta a una richiesta di permesso, `open()` resta fermo. Dopo 8 secondi senza nuove voci l'app lo segnala, e "Annulla" funziona comunque: l'attesa finisce subito e il thread fermo termina da solo quando il sistema lo rilascia. Con la firma ad hoc ogni compilazione conta come un'app nuova e queste richieste possono ripresentarsi, un motivo in più per il certificato stabile.
+### Interface and responsiveness
 
-### Interfaccia e reattività
+The app is in `Sources/iMemoryApp`, in SwiftUI. `Scripts/build-app.sh` builds it into `build/iMemory.app`. `Scripts/check-app.sh` drives it through a fixed route and records the main thread's worst stall.
 
-L'app è in `Sources/iMemoryApp`, in SwiftUI. Si compila con `Scripts/build-app.sh`, che crea `build/iMemory.app`. `Scripts/check-app.sh` le fa percorrere un giro fisso e registra il blocco massimo del thread principale.
+**The list is an `NSTableView`, not SwiftUI's `Table`.** With 42,680 rows, re-sorting a `Table` blocked the app for up to 12.5 seconds, because it compares every row. `NSTableView` reloads only the visible rows.
 
-**Elenco in `NSTableView`, non in `Table` di SwiftUI.** Con 42 680 righe, riordinare in `Table` bloccava l'app fino a 12,5 secondi, perché confronta ogni riga. `NSTableView` ricarica solo le righe visibili.
+**Filtering and sorting run in the background** above 5,000 rows, so the main thread stays free.
 
-**Filtri e ordinamenti in background** sopra le 5000 righe, così il thread principale resta libero.
+**Results** with about 1 million entries, without Full Disk Access:
 
-**Risultati** con 1,04 milioni di voci, senza Accesso completo al disco, su questo Mac:
-
-| Operazione | Blocco massimo |
+| Operation | Worst stall |
 |---|---:|
-| Entrare in una cartella | 35-110 ms |
-| Ordinare, cercare e filtrare con 42 680 righe | 40-90 ms |
-| Selezionare una riga | 10-20 ms |
-| Ridimensionare la finestra | 25-100 ms |
-| Tornare a Panoramica | 150 ms |
-| Riaprire Esplora | 250 ms |
-| Prima apertura di Esplora | 350-520 ms |
+| Opening a folder | 35–110 ms |
+| Sorting, searching, and filtering 42,680 rows | 40–90 ms |
+| Selecting a row | 10–20 ms |
+| Resizing the window | 25–100 ms |
+| Going back to Overview | 150 ms |
+| Reopening Explore | 250 ms |
+| Opening Explore the first time | 350–520 ms |
 
-Il costo di queste operazioni dipende dal contenuto della cartella aperta e non dalle voci totali, ma con 1,25 milioni di voci non è stato misurato. Cambiare sezione è la parte più lenta: si può ridurre tenendo Esplora in memoria, se nell'uso reale dà fastidio.
+These costs depend on the open folder's contents, not on the total number of entries. Switching sections is the slowest part.
 
-### Permessi e distribuzione
+### Permissions and distribution
 
-- **Accesso completo al disco:** necessario per una scansione completa. L'app funziona anche senza, segnalando chiaramente cosa non ha potuto leggere.
-- **Niente sandbox, quindi niente Mac App Store.** La sandbox impedirebbe di leggere e pulire le cartelle delle altre app.
-- **Distribuzione:** nessuna. L'app si compila e si esegue su questo Mac, quindi non servono notarizzazione, aggiornamenti automatici né traduzioni: l'interfaccia è solo in italiano.
-- **Versione minima:** macOS 27, senza codice di compatibilità per versioni precedenti.
-- **Firma:** sul Mac non c'è ancora nessun certificato. Con la firma ad hoc macOS collega l'Accesso completo al disco alla singola build, quindi il permesso andrebbe ridato dopo ogni compilazione. Dalla tappa M1 serve un certificato stabile: quello gratuito "Apple Development", che si ottiene aggiungendo il proprio Apple ID in Xcode. La CLI di M0 non ne ha bisogno, perché usa i permessi del terminale da cui parte.
-- **Niente helper privilegiato nella 1.0.** Tutto ciò che è nella cartella utente non richiede privilegi di amministratore, e un helper aggiunge una superficie d'attacco. Si valuta con `SMAppService` solo se servirà per `/Library/Caches`.
+- **Full Disk Access:** needed for a complete scan. The app works without it, and says clearly what it couldn't read.
+- **No sandbox, so no Mac App Store.** The sandbox would stop the app from reading and cleaning other apps' folders.
+- **Distribution:** none. You build and run it yourself; it isn't notarized and has no automatic updates.
+- **Minimum version:** macOS 27, with no compatibility code for earlier versions.
+- **Signing:** `build-app.sh` uses an "Apple Development" certificate if there is one, and signs ad hoc otherwise. With ad hoc signing, macOS ties Full Disk Access to a single build, so the permission has to be granted again after every build. The free "Apple Development" certificate comes from adding an Apple ID in Xcode. The command-line tool doesn't need it, because it uses the permissions of the terminal it runs in.
+- **No privileged helper.** Nothing in the home folder needs administrator rights, and a helper would add attack surface.
 
-## 6. Interfaccia
+## 6. Interface
 
-Finestra unica con barra laterale: Panoramica, Esplora, Pulizia, Sviluppatore, Cronologia.
+A single window with a sidebar: Overview, Explore, Apps, Large files, Duplicates, Cleanup, Developer, History, Automation.
 
-- **Panoramica:** barra dello spazio, cosa è cresciuto, azioni consigliate con lo spazio recuperabile.
-- **Esplora:** treemap a sinistra, elenco a destra, percorso in alto. Selezionare in uno aggiorna l'altro.
-- **Pannello dettagli:** tre dimensioni, ultima modifica, app proprietaria, spiegazione della regola.
-- **Conferma:** riepilogo con numero di voci, spazio stimato come intervallo, e cosa succede dopo.
+- **Overview:** the space bar, what grew, suggested actions with the space they'd recover.
+- **Explore:** the treemap on the left, the list on the right, the path on top. Selecting in one updates the other.
+- **Details panel:** the three sizes, last modification, and notes about the item.
+- **Confirmation:** the number of items, the estimated space as a range, what happens next, and the cost of each item that needs reviewing.
 
-Durante la scansione si vedono voci trovate e spazio misurato, e si può annullare. I risultati si possono navigare solo alla fine: con circa 15 secondi di scansione non vale ancora la complessità di un albero parziale.
+During a scan you see the entries found and the space measured, and you can cancel. Results can be explored only once the scan ends.
 
-## 7. Test
+## 7. Tests
 
-- **Motore:** confronto automatico con `du` su alberi con hard link, cloni, link simbolici, file sparsi e file iCloud non scaricati.
-- **Misure sul disco:** i test che confrontano lo spazio del volume stanno in un'unica suite in serie, perché affiancati si falsano a vicenda.
-- **Sicurezza:** `CleanKit` lavora solo su una Home finta in una cartella temporanea, con casi avversi: link simbolici nella radice, nel percorso e dentro le cartelle, percorsi con `..`, file e cartelle sostituiti dopo la scansione, app proprietaria aperta, hard link, file protetti, cartelle illeggibili, volume montato dentro la cartella, percorsi oltre `PATH_MAX`.
-- **Giro automatico:** `Scripts/check-app.sh` percorre anche una pulizia completa dalle schermate, su una Home finta. Non chiama mai la pulizia sui dati reali.
-- **Regole:** validazione del catalogo. Nessuna regola può puntare a radici vietate come `~`, `~/Documents`, `~/Library/Application Support` o `/`.
-- **Non coperto da test automatici:** file solo nel cloud dentro una cartella da pulire. Il comportamento è impostato (`IOPOL_MATERIALIZE_DATALESS_FILES_OFF`), ma non è possibile creare questi file in una prova.
+- **Engine:** automatic comparison with `du` on trees with hard links, clones, symbolic links, sparse files, and paths beyond `PATH_MAX`.
+- **Measurements on the disk:** the tests that compare the volume's space run in a single serial suite, because side by side they'd skew each other. They retry up to three times: a wrong estimate fails every time, while other apps' writes don't last three runs.
+- **Safety:** `CleanKit` works only on a fake home in a temporary folder, with adversarial cases: symbolic links in the root, along the path, and inside folders, paths with `..`, files and folders replaced after the scan, an open owner app, hard links, protected files, unreadable folders, a volume mounted inside the folder, and paths beyond `PATH_MAX`.
+- **Commands:** run with a recorder instead of the real tools, plus checks of the runner itself on harmless programs.
+- **Duplicates:** real APFS clones, hard links, and files that differ only in the middle.
+- **Scripted run:** `Scripts/check-app.sh` also goes through a full cleanup and a full uninstall from the screens, on a fake home with a fake Trash. It never runs a cleanup on real data.
+- **Rules:** catalog validation. No rule can point at forbidden roots such as `~`, `~/Documents`, `~/Library/Application Support`, or `/`.
+- **Not covered by automated tests:** cloud-only files inside a folder being cleaned. The behaviour is set (`IOPOL_MATERIALIZE_DATALESS_FILES_OFF`), but these files can't be created in a test.
 
-## 8. Tappe
+## 8. Milestones
 
-| Tappa | Contenuto | Criterio di completamento |
+| Milestone | Content | State |
 |---|---|---|
-| M0 (fatta) | `ScanKit` e CLI | Totali uguali a `du` su tutto il disco, tempi e memoria misurati dopo `sudo purge`; manca solo la misura dopo un riavvio |
-| M1 (da provare a mano) | App in sola lettura: Panoramica, Esplora | Blocchi sotto i 110 ms navigando con 1,04 milioni di voci; mancano la prova con mouse e tastiera e la misura con Accesso completo al disco |
-| M2 (da provare sui dati veri) | `RulesKit`, `CleanKit`, Pulizia, Cronologia | Test avversi superati; su Home finta spazio misurato entro il 5% dell'atteso (60,4 MB su 60 MB nell'app); manca la prima pulizia reale, che spetta all'utente |
-| M3 (da provare sui dati veri) | Sezione Sviluppatore | Comandi in lista chiusa e provati con esecuzioni simulate; `simctl erase all` e `brew cleanup` non sono mai stati eseguiti davvero: la prima volta spetta all'utente |
-| M4 (da provare sui dati veri) | App e file grandi | Stima del recupero verificata con eliminazioni reali su file di prova; disinstallazione provata su un'app finta con un Cestino finto; lo spostamento di un'app vera nel Cestino vero non è mai stato eseguito |
-| M5 (da provare sui dati veri) | Duplicati e automazione | Nessun clone APFS segnalato come duplicato, verificato con cloni veri; ricerca reale su questo Mac in sola lettura; notifiche, menu della barra e pulizia programmata reale mai eseguiti |
+| M0 | `ScanKit` and the CLI | Done: totals equal to `du` on the whole disk; a measurement after a restart is missing |
+| M1 | Read-only app: Overview, Explore | Stalls under 110 ms with about 1 million entries; still to try with mouse and keyboard |
+| M2 | `RulesKit`, `CleanKit`, Cleanup, History | Adversarial tests pass; on a fake home, measured space within 5% of the expected; no real cleanup yet |
+| M3 | Developer section | Commands tested with recorded runs; `simctl erase all` and `brew cleanup` have never run for real |
+| M4 | Apps and large files | Recovery estimate checked against real removals of test files; a real app has never been moved to the real Trash |
+| M5 | Duplicates and automation | No APFS clone reported as a duplicate, checked with real clones; notifications, the menu bar menu, and a real scheduled cleanup have never run |
 
-Nelle prime due tappe l'app non può cancellare nulla: la parte rischiosa arriva quando le misure sono già verificate.
+In the first two milestones the app couldn't delete anything: the risky part came only once the measurements were verified.
 
-## 9. Punti aperti
+## 9. Open points
 
-- **Volumi esterni:** esclusi dalla 1.0, salvo necessità.
+- **External volumes:** left out.
+- **Localization:** the interface is in English only.

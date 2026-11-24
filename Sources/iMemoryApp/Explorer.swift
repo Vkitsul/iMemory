@@ -22,18 +22,18 @@ nonisolated struct NodeRow: Identifiable, Sendable {
 }
 
 nonisolated enum KindFilter: String, CaseIterable, Identifiable {
-    case all = "Tutto"
-    case folders = "Cartelle"
-    case files = "File"
+    case all = "All"
+    case folders = "Folders"
+    case files = "Files"
 
     var id: Self { self }
 }
 
 enum AgeFilter: String, CaseIterable, Identifiable {
-    case any = "Qualsiasi data"
-    case oneMonth = "Più di 1 mese fa"
-    case sixMonths = "Più di 6 mesi fa"
-    case oneYear = "Più di 1 anno fa"
+    case any = "Any date"
+    case oneMonth = "Over 1 month ago"
+    case sixMonths = "Over 6 months ago"
+    case oneYear = "Over 1 year ago"
 
     var id: Self { self }
 
@@ -49,10 +49,10 @@ enum AgeFilter: String, CaseIterable, Identifiable {
 }
 
 enum SizeFilter: String, CaseIterable, Identifiable {
-    case any = "Qualsiasi dimensione"
-    case oneMB = "Oltre 1 MB"
-    case hundredMB = "Oltre 100 MB"
-    case oneGB = "Oltre 1 GB"
+    case any = "Any size"
+    case oneMB = "Over 1 MB"
+    case hundredMB = "Over 100 MB"
+    case oneGB = "Over 1 GB"
 
     var id: Self { self }
 

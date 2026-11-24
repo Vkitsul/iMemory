@@ -13,10 +13,10 @@ private final class Home {
 
     init() throws {
         base = try FakeHome()
-        try base.folder("Users/io/Documents")
+        try base.folder("Users/me/Documents")
     }
 
-    func path(_ relative: String) -> String { base.at("Users/io/" + relative) }
+    func path(_ relative: String) -> String { base.at("Users/me/" + relative) }
 
     func write(_ data: Data, to relative: String) throws {
         let full = path(relative)
@@ -30,7 +30,7 @@ private final class Home {
 
     func find(minimum: Int64 = 100_000) async throws -> DuplicateSearchResult {
         let tree = try await FileScanner().scan(root: root).tree
-        return DuplicateFinder.find(tree: tree, homeInTree: "Users/io", realRoot: root, minimumBytes: minimum)
+        return DuplicateFinder.find(tree: tree, homeInTree: "Users/me", realRoot: root, minimumBytes: minimum)
     }
 }
 
@@ -40,9 +40,9 @@ private func random(_ size: Int) -> Data {
     return Data(bytes)
 }
 
-@Suite("Duplicati")
+@Suite("Duplicates")
 struct DuplicateFinderTests {
-    @Test("Due copie vere sono un gruppo, e si recupera una copia")
+    @Test("Two real copies form a group, and one copy is recovered")
     func realCopies() async throws {
         let home = try Home()
         let data = random(500_000)
@@ -59,16 +59,16 @@ struct DuplicateFinderTests {
         #expect(group.reclaimable < 600_000)
     }
 
-    @Test("Due cloni APFS non sono duplicati")
+    @Test("Two APFS clones aren't duplicates")
     func clonesAreNotDuplicates() async throws {
         let home = try Home()
-        try home.write(random(500_000), to: "Documents/originale")
-        try home.clone("Documents/originale", to: "Documents/clone")
+        try home.write(random(500_000), to: "Documents/original")
+        try home.clone("Documents/original", to: "Documents/clone")
 
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("Tre cloni dello stesso file non sono duplicati")
+    @Test("Three clones of the same file aren't duplicates")
     func threeClones() async throws {
         let home = try Home()
         try home.write(random(500_000), to: "Documents/a")
@@ -78,7 +78,7 @@ struct DuplicateFinderTests {
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("Un clone diverso dal suo originale dopo una modifica non è un duplicato")
+    @Test("A clone that differs from its original after an edit isn't a duplicate")
     func divergedClone() async throws {
         let home = try Home()
         try home.write(random(500_000), to: "Documents/a")
@@ -90,13 +90,13 @@ struct DuplicateFinderTests {
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("Con due cloni e una copia separata si contano due copie, non tre")
+    @Test("Two clones and a separate copy count as two copies, not three")
     func clonesPlusRealCopy() async throws {
         let home = try Home()
         let data = random(500_000)
         try home.write(data, to: "Documents/a")
         try home.clone("Documents/a", to: "Documents/clone")
-        try home.write(data, to: "Documents/separata")
+        try home.write(data, to: "Documents/separate")
 
         let group = try #require(try await home.find().groups.first)
 
@@ -106,7 +106,7 @@ struct DuplicateFinderTests {
         #expect(group.files.filter(\.isClone).map { URL(fileURLWithPath: $0.path).lastPathComponent }.sorted() == ["a", "clone"])
     }
 
-    @Test("Un hard link non è un duplicato")
+    @Test("A hard link isn't a duplicate")
     func hardLink() async throws {
         let home = try Home()
         try home.write(random(500_000), to: "Documents/a")
@@ -115,55 +115,55 @@ struct DuplicateFinderTests {
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("Stessa dimensione ma contenuto diverso: non sono duplicati", arguments: [
-        "inizio", "mezzo", "fine",
+    @Test("Same size but different content: not duplicates", arguments: [
+        "start", "middle", "end",
     ])
     func sameSizeDifferentContent(place: String) async throws {
         let home = try Home()
         var data = random(1_000_000)
         try home.write(data, to: "Documents/a")
-        // Il mezzo sfugge al confronto parziale: lo deve cogliere il confronto completo.
-        let index = place == "inizio" ? 10 : place == "mezzo" ? 500_000 : 999_990
+        // The middle escapes the partial comparison: the full one must catch it.
+        let index = place == "start" ? 10 : place == "middle" ? 500_000 : 999_990
         data[index] = data[index] &+ 1
         try home.write(data, to: "Documents/b")
 
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("Non considera Libreria, cartelle nascoste e pacchetti", arguments: [
-        "Library/Caches/copia", ".git/copia", "progetto/.git/copia",
-        "Pictures/Foto.photoslibrary/copia", "Applications/Mia.app/copia",
+    @Test("Ignores the Library, hidden folders, and packages", arguments: [
+        "Library/Caches/copy", ".git/copy", "project/.git/copy",
+        "Pictures/Foto.photoslibrary/copy", "Applications/Mine.app/copy",
     ])
     func skippedPlaces(relative: String) async throws {
         let home = try Home()
         let data = random(500_000)
-        try home.write(data, to: "Documents/originale")
+        try home.write(data, to: "Documents/original")
         try home.write(data, to: relative)
 
         #expect(try await home.find().groups.isEmpty)
     }
 
-    @Test("I file piccoli e vuoti non si considerano")
+    @Test("Small and empty files are ignored")
     func smallFiles() async throws {
         let home = try Home()
         let data = random(50_000)
         try home.write(data, to: "Documents/a")
         try home.write(data, to: "Documents/b")
-        try home.write(Data(), to: "Documents/vuoto1")
-        try home.write(Data(), to: "Documents/vuoto2")
+        try home.write(Data(), to: "Documents/empty1")
+        try home.write(Data(), to: "Documents/empty2")
 
         #expect(try await home.find(minimum: 100_000).groups.isEmpty)
     }
 
-    @Test("Un file illeggibile si conta e la ricerca prosegue")
+    @Test("An unreadable file is counted and the search goes on")
     func unreadableFile() async throws {
         let home = try Home()
         let data = random(500_000)
         try home.write(data, to: "Documents/a")
         try home.write(data, to: "Documents/b")
-        try home.write(data, to: "Documents/chiuso")
-        #expect(chmod(home.path("Documents/chiuso"), 0) == 0)
-        defer { chmod(home.path("Documents/chiuso"), 0o644) }
+        try home.write(data, to: "Documents/lockedfile")
+        #expect(chmod(home.path("Documents/lockedfile"), 0) == 0)
+        defer { chmod(home.path("Documents/lockedfile"), 0o644) }
 
         let result = try await home.find()
 
@@ -171,7 +171,7 @@ struct DuplicateFinderTests {
         #expect(result.groups.first?.files.count == 2)
     }
 
-    @Test("La ricerca si può interrompere")
+    @Test("The search can be stopped")
     func cancellation() async throws {
         let home = try Home()
         let data = random(500_000)
@@ -179,13 +179,13 @@ struct DuplicateFinderTests {
         try home.write(data, to: "Documents/b")
         let tree = try await FileScanner().scan(root: home.root).tree
 
-        let result = DuplicateFinder.find(tree: tree, homeInTree: "Users/io", realRoot: home.root, minimumBytes: 100_000, isCancelled: { true })
+        let result = DuplicateFinder.find(tree: tree, homeInTree: "Users/me", realRoot: home.root, minimumBytes: 100_000, isCancelled: { true })
 
         #expect(result.wasCancelled)
         #expect(result.groups.isEmpty)
     }
 
-    @Test("I gruppi sono ordinati dal maggior recupero")
+    @Test("Groups are sorted by most recovered")
     func ordering() async throws {
         let home = try Home()
         let small = random(200_000)
@@ -202,7 +202,7 @@ struct DuplicateFinderTests {
     }
 }
 
-@Suite("Scelta dei duplicati")
+@Suite("Choosing duplicates")
 struct DuplicateSelectionTests {
     private func file(_ name: String) -> DuplicateFile {
         DuplicateFile(path: "/x/" + name, fileID: 1, allocated: 10, modified: .now, isClone: false)
@@ -212,14 +212,14 @@ struct DuplicateSelectionTests {
         DuplicateGroup(digest: "d", files: [file("a"), file("b"), file("c")], copies: 3, reclaimable: 20)
     }
 
-    @Test("Scegliere tutte le copie di un gruppo non è possibile")
+    @Test("Choosing every copy in a group isn't possible")
     func everyCopy() {
         #expect(throws: DuplicateSelection.SelectionError.wouldRemoveEveryCopy(digest: "d")) {
             try DuplicateSelection(groups: [group], selected: ["/x/a", "/x/b", "/x/c"])
         }
     }
 
-    @Test("Resta sempre una copia, indicata come da tenere")
+    @Test("A copy always stays, marked as the one to keep")
     func keepsOne() throws {
         let selection = try DuplicateSelection(groups: [group], selected: ["/x/a", "/x/c"])
 
@@ -227,7 +227,7 @@ struct DuplicateSelectionTests {
         #expect(selection.toKeep.map(\.id) == ["/x/b"])
     }
 
-    @Test("Un gruppo senza selezione non partecipa")
+    @Test("A group with nothing selected takes no part")
     func untouched() throws {
         let selection = try DuplicateSelection(groups: [group], selected: [])
 
@@ -236,13 +236,13 @@ struct DuplicateSelectionTests {
     }
 }
 
-@Suite("Cestino: la copia da tenere")
+@Suite("Trash: the copy to keep")
 struct KeepCopyTests {
     private func mover(_ home: Home) throws -> TrashMover {
-        try home.base.folder("CestinoFinto")
-        let trash = home.base.at("CestinoFinto")
+        try home.base.folder("FakeTrash")
+        let trash = home.base.at("FakeTrash")
         return TrashMover(
-            policy: TrashPolicy(home: home.base.at("Users/io"), appFolders: []),
+            policy: TrashPolicy(home: home.base.at("Users/me"), appFolders: []),
             runningProcesses: { [] },
             moveToTrash: { url in
                 try FileManager.default.moveItem(at: url, to: URL(fileURLWithPath: trash + "/" + url.lastPathComponent))
@@ -256,7 +256,7 @@ struct KeepCopyTests {
         return TrashItem(path: home.path(relative), fileID: info.st_ino, allocated: 1, kind: .file)
     }
 
-    @Test("Con la copia da tenere al suo posto, l'altra si sposta")
+    @Test("With the copy to keep in place, the other one moves")
     func normal() async throws {
         let home = try Home()
         try home.write(random(1_000), to: "Documents/a")
@@ -272,7 +272,7 @@ struct KeepCopyTests {
         #expect(FileManager.default.fileExists(atPath: home.path("Documents/b")))
     }
 
-    @Test("Se la copia da tenere è sparita, non si sposta nulla")
+    @Test("If the copy to keep is gone, nothing moves")
     func keeperGone() async throws {
         let home = try Home()
         try home.write(random(1_000), to: "Documents/a")
@@ -288,17 +288,17 @@ struct KeepCopyTests {
         #expect(report.rules[0].issues.first?.problem == .copyToKeepChanged)
     }
 
-    @Test("Se la copia da tenere è stata sostituita, non si sposta nulla")
+    @Test("If the copy to keep was replaced, nothing moves")
     func keeperReplaced() async throws {
         let home = try Home()
         try home.write(random(1_000), to: "Documents/a")
         try home.write(random(1_000), to: "Documents/b")
         let toMove = try item(home, "Documents/a")
         let toKeep = try item(home, "Documents/b")
-        try home.write(random(1_000), to: "Documents/segnaposto")
+        try home.write(random(1_000), to: "Documents/placeholder")
         try FileManager.default.removeItem(atPath: home.path("Documents/b"))
         try home.write(random(1_000), to: "Documents/b")
-        try FileManager.default.removeItem(atPath: home.path("Documents/segnaposto"))
+        try FileManager.default.removeItem(atPath: home.path("Documents/placeholder"))
 
         let report = await try mover(home).run(title: "Duplicati", items: [toMove], mustRemain: [toKeep])
 
@@ -306,7 +306,7 @@ struct KeepCopyTests {
         #expect(report.rules[0].issues.first?.problem == .copyToKeepChanged)
     }
 
-    @Test("Lo stesso file non può essere da spostare e da tenere")
+    @Test("The same file can't be both moved and kept")
     func sameFileInBoth() async throws {
         let home = try Home()
         try home.write(random(1_000), to: "Documents/a")
@@ -319,7 +319,7 @@ struct KeepCopyTests {
     }
 }
 
-@Suite("Automazione")
+@Suite("Automation")
 struct AutomationTests {
     private func candidate(_ level: RiskLevel, command: Bool = false, id: String) -> CleanupCandidate {
         let rule = CleaningRule(
@@ -330,7 +330,7 @@ struct AutomationTests {
         return CleanupCandidate(rule: rule, roots: [], commandEstimate: command ? 1 : nil)
     }
 
-    @Test("Le impostazioni di partenza non eliminano nulla")
+    @Test("The default settings delete nothing")
     func defaults() {
         let settings = AutomationSettings()
 
@@ -338,20 +338,20 @@ struct AutomationTests {
         #expect(!settings.warnsOnLowSpace)
     }
 
-    @Test("Un file di impostazioni assente o danneggiato non attiva nulla")
+    @Test("A missing or damaged settings file turns nothing on")
     func damagedSettings() throws {
         let home = try FakeHome()
-        let url = URL(fileURLWithPath: home.at("impostazioni.json"))
+        let url = URL(fileURLWithPath: home.at("settings.json"))
 
         #expect(!AutomationSettings.load(from: url).cleansOnSchedule)
-        try Data("{ non valido".utf8).write(to: url)
+        try Data("{ not valid".utf8).write(to: url)
         #expect(!AutomationSettings.load(from: url).cleansOnSchedule)
     }
 
-    @Test("Le impostazioni si salvano e si rileggono")
+    @Test("Settings are saved and loaded back")
     func roundTrip() throws {
         let home = try FakeHome()
-        let url = URL(fileURLWithPath: home.at("sotto/impostazioni.json"))
+        let url = URL(fileURLWithPath: home.at("sub/settings.json"))
         var settings = AutomationSettings()
         settings.cleansOnSchedule = true
         settings.interval = .monthly
@@ -362,7 +362,7 @@ struct AutomationTests {
         #expect(AutomationSettings.load(from: url) == settings)
     }
 
-    @Test("Solo le voci sicure che eliminano file possono partire da sole")
+    @Test("Only safe items that delete files can run by themselves")
     func eligible() {
         let found = ScheduledCleanup.eligible([
             candidate(.safe, id: "sicura"),
@@ -374,7 +374,7 @@ struct AutomationTests {
         #expect(found.map(\.id) == ["sicura"])
     }
 
-    @Test("Nel catalogo vero le voci automatiche non comprendono simulatori e cache dei browser")
+    @Test("In the real catalog, automatic items include neither simulators nor browser caches")
     func eligibleInRealCatalog() throws {
         let rules = try RuleCatalog.builtIn().rules
         let candidates = rules.map { CleanupCandidate(rule: $0, roots: [], commandEstimate: $0.command == nil ? nil : 1) }
@@ -384,7 +384,7 @@ struct AutomationTests {
         #expect(ids == ["homebrew.cache", "pip.cache", "npm.cache", "logs.old"])
     }
 
-    @Test("La pulizia non è mai dovuta se è spenta")
+    @Test("The cleanup is never due when it's off")
     func notDueWhenOff() {
         var settings = AutomationSettings()
         settings.lastScheduledCleanup = .distantPast
@@ -393,7 +393,7 @@ struct AutomationTests {
         #expect(!ScheduledCleanup.isDue(settings: settings, now: .now))
     }
 
-    @Test("Attivarla non elimina subito: la prima aspetta un intervallo intero")
+    @Test("Turning it on deletes nothing at once: the first waits a full interval")
     func firstRunWaits() {
         var settings = AutomationSettings()
         let enabled = Date(timeIntervalSince1970: 1_000_000)
@@ -404,10 +404,10 @@ struct AutomationTests {
         #expect(ScheduledCleanup.isDue(settings: settings, now: enabled.addingTimeInterval(7 * 86_400)))
     }
 
-    @Test("Riaprire l'app non fa ripartire il conto dell'intervallo")
+    @Test("Reopening the app doesn't restart the interval")
     func intervalSurvivesRelaunch() throws {
         let home = try FakeHome()
-        let url = URL(fileURLWithPath: home.at("impostazioni.json"))
+        let url = URL(fileURLWithPath: home.at("settings.json"))
         var settings = AutomationSettings()
         let enabled = Date(timeIntervalSince1970: 1_000_000)
         settings.setCleansOnSchedule(true, now: enabled)
@@ -418,7 +418,7 @@ struct AutomationTests {
         #expect(ScheduledCleanup.isDue(settings: reopened, now: enabled.addingTimeInterval(8 * 86_400)))
     }
 
-    @Test("Spegnerla e riaccenderla fa ripartire l'attesa intera")
+    @Test("Turning it off and on again restarts the full wait")
     func reEnableWaitsAgain() {
         var settings = AutomationSettings()
         let start = Date(timeIntervalSince1970: 1_000_000)
@@ -432,7 +432,7 @@ struct AutomationTests {
         #expect(ScheduledCleanup.isDue(settings: settings, now: later.addingTimeInterval(7 * 86_400)))
     }
 
-    @Test("Senza un riferimento nel tempo non parte")
+    @Test("Without a reference date it doesn't run")
     func noReference() {
         var settings = AutomationSettings()
         settings.cleansOnSchedule = true
@@ -440,7 +440,7 @@ struct AutomationTests {
         #expect(!ScheduledCleanup.isDue(settings: settings, now: .now))
     }
 
-    @Test("La frequenza decide quando ripartire", arguments: [
+    @Test("The frequency decides when to run again", arguments: [
         (AutomationSettings.Interval.weekly, 8.0, true),
         (AutomationSettings.Interval.weekly, 6.0, false),
         (AutomationSettings.Interval.monthly, 8.0, false),
@@ -456,17 +456,17 @@ struct AutomationTests {
         #expect(ScheduledCleanup.isDue(settings: settings, now: last.addingTimeInterval(days * 86_400)) == expected)
     }
 
-    @Test("L'avviso arriva una volta, e di nuovo solo dopo un recupero")
+    @Test("The warning comes once, and again only after recovering")
     func spaceWatch() {
         var watch = SpaceWatch(threshold: 100)
 
         let warnings = [200, 90, 80, 105, 95, 120, 90].map { watch.shouldWarn(free: Int64($0)) }
 
-        // Sale a 105: sopra la soglia ma entro il margine, quindi a 95 non riavvisa.
+        // Rises to 105: above the threshold but within the margin, so 95 doesn't warn again.
         #expect(warnings == [false, true, false, false, false, false, true])
     }
 
-    @Test("Il riconoscimento dello spazio basso segue la soglia")
+    @Test("Low space detection follows the threshold")
     func isLow() {
         let watch = SpaceWatch(threshold: 100)
 

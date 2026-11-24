@@ -1,9 +1,9 @@
-// Disegna l'icona di iMemory e crea Resources/AppIcon.icns.
+// Draws iMemory's icon and creates Resources/AppIcon.icns.
 //
-// uso: swift Scripts/make-icon.swift
+// usage: swift Scripts/make-icon.swift
 //
-// Tutto è disegnato con forme semplici: nessun simbolo di sistema, perché la licenza
-// dei SF Symbols non ne consente l'uso nelle icone delle app.
+// Everything is drawn with plain shapes and no system symbols, because the SF Symbols
+// license doesn't allow them in app icons.
 import AppKit
 
 /// The icon at 1024 points, drawn so that any size is a plain scale of it.
@@ -110,5 +110,5 @@ iconutil.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 iconutil.arguments = ["-c", "icns", iconset.path, "-o", resources.appendingPathComponent("AppIcon.icns").path]
 try iconutil.run()
 iconutil.waitUntilExit()
-guard iconutil.terminationStatus == 0 else { fatalError("iconutil non è riuscito") }
+guard iconutil.terminationStatus == 0 else { fatalError("iconutil failed") }
 print(resources.appendingPathComponent("AppIcon.icns").path)

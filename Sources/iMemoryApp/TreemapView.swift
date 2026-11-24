@@ -41,7 +41,7 @@ struct TreemapView: View {
             statusLine
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Mappa della cartella. Usa l'elenco accanto per navigare con la tastiera.")
+        .accessibilityLabel("Folder map. Use the list beside it to navigate with the keyboard.")
     }
 
     private var statusLine: some View {
@@ -58,9 +58,9 @@ struct TreemapView: View {
     }
 
     private var statusText: String {
-        guard let hovered else { return "Clic per selezionare, doppio clic per entrare in una cartella." }
+        guard let hovered else { return "Click to select, double-click to open a folder." }
         guard let node = hovered.node else {
-            return "\(Format.count(hovered.groupedItems)) elementi troppo piccoli da disegnare"
+            return "\(Format.count(hovered.groupedItems)) items too small to draw"
         }
         let tree = explorer.tree
         return "\(tree.name(of: node)): \(Format.bytes(tree.sizes(of: node).allocated))"
@@ -74,7 +74,7 @@ struct TreemapView: View {
         labels = cells.map { cell in
             guard let node = cell.node else {
                 return cell.groupedItems > 0 && cell.rect.width >= 70 && cell.rect.height >= 15
-                    ? "\(Format.count(cell.groupedItems)) piccoli"
+                    ? "\(Format.count(cell.groupedItems)) small"
                     : nil
             }
             // Resolving names only for cells wide enough to show one saves most of the work.

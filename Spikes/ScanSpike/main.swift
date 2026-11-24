@@ -1,5 +1,5 @@
-// Spike di sola lettura: confronta due modi di misurare un albero di cartelle
-// e legge i contatori del volume. Non modifica nulla.
+// Read-only spike: compares two ways of measuring a folder tree
+// and reads the volume counters. Changes nothing.
 import Foundation
 import Darwin
 

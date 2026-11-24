@@ -39,7 +39,7 @@ final class CleanupModel {
     ///   - home: The home that rules apply to. Only the self-check passes another one.
     init(
         home: String = NSHomeDirectory(),
-        historyFile: URL = AppStorage.folder.appendingPathComponent("cronologia.jsonl")
+        historyFile: URL = AppStorage.folder.appendingPathComponent("history.jsonl")
     ) {
         self.home = home
         self.historyFile = CleanupHistory(file: historyFile)
@@ -146,18 +146,18 @@ enum AppStorage {
 extension RemovalProblem {
     var message: String {
         switch self {
-        case .outsideRoot: "Fuori dalle cartelle ammesse dalla regola"
-        case .symbolicLinkInPath: "Nel percorso c'è un link simbolico"
-        case .changedSinceScan: "Cambiato dopo la scansione"
-        case .otherVolume: "Qui è montato un altro volume"
+        case .outsideRoot: "Outside the folders the rule allows"
+        case .symbolicLinkInPath: "There's a symbolic link in the path"
+        case .changedSinceScan: "Changed since the scan"
+        case .otherVolume: "Another volume is mounted here"
         case .system(let code): String(cString: strerror(code))
         case .copyToKeepChanged:
-            "La copia da tenere è sparita o cambiata, quindi non è stato spostato nulla."
+            "The copy to keep is gone or has changed, so nothing was moved."
         case .trashFailed(let message):
-            "Non è stato possibile spostarlo nel Cestino. Se appartiene al sistema o ad App Store, spostalo dal Finder. \(message)"
+            "Couldn't move it to the Trash. If it belongs to the system or the App Store, move it from the Finder. \(message)"
         case .commandFailed(let status, let output):
-            status.map { "Il comando è terminato con errore \($0). \(output)" }
-                ?? "Il comando non è partito o non è finito in tempo. \(output)"
+            status.map { "The command failed with status \($0). \(output)" }
+                ?? "The command didn't start or didn't finish in time. \(output)"
         }
     }
 }

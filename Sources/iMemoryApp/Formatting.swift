@@ -3,46 +3,47 @@ import ScanKit
 import SwiftUI
 
 enum Format {
-    private static let italian = Locale(identifier: "it_IT")
+    /// Follows the region set on the Mac, like any app.
+    private static let locale = Locale.autoupdatingCurrent
 
     static func bytes(_ value: Int64) -> String {
-        value.formatted(.byteCount(style: .file).locale(italian))
+        value.formatted(.byteCount(style: .file).locale(locale))
     }
 
     static func count(_ value: Int) -> String {
-        value.formatted(.number.locale(italian))
+        value.formatted(.number.locale(locale))
     }
 
     static func items(_ value: Int) -> String {
-        "\(count(value)) \(value == 1 ? "voce" : "voci")"
+        "\(count(value)) \(value == 1 ? "item" : "items")"
     }
 
     static func date(_ value: Date) -> String {
-        value.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(italian))
+        value.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
     }
 
     static func dateTime(_ value: Date) -> String {
-        value.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(italian))
+        value.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))
     }
 
     /// How much a cleanup will free. Two figures only when clones make them differ.
     static func spaceRange(minimum: Int64, maximum: Int64) -> String {
         let low = bytes(minimum), high = bytes(maximum)
-        if low == high { return "Libera \(high)" }
-        return minimum == 0 ? "Libera fino a \(high)" : "Libera fra \(low) e \(high)"
+        if low == high { return "Frees \(high)" }
+        return minimum == 0 ? "Frees up to \(high)" : "Frees \(low) to \(high)"
     }
 
     /// The same estimate, for a report written after the fact.
     static func estimate(minimum: Int64, maximum: Int64) -> String {
         let low = bytes(minimum), high = bytes(maximum)
         if low == high { return high }
-        return minimum == 0 ? "fino a \(high)" : "\(low)–\(high)"
+        return minimum == 0 ? "up to \(high)" : "\(low)–\(high)"
     }
 
     static func seconds(_ duration: Duration) -> String {
         let parts = duration.components
         let value = Double(parts.seconds) + Double(parts.attoseconds) / 1e18
-        return value.formatted(.number.precision(.fractionLength(1)).locale(italian)) + " s"
+        return value.formatted(.number.precision(.fractionLength(1)).locale(locale)) + " s"
     }
 
     /// The path as the user knows it, without the prefix of the data volume.
@@ -56,31 +57,31 @@ enum Format {
 extension StorageBreakdown.Kind {
     var title: String {
         switch self {
-        case .applications: "App"
-        case .appData: "Dati delle app"
-        case .photos: "Immagini"
-        case .iPhoneBackups: "Backup di iPhone"
-        case .developer: "Sviluppatore"
+        case .applications: "Apps"
+        case .appData: "App data"
+        case .photos: "Pictures"
+        case .iPhoneBackups: "iPhone backups"
+        case .developer: "Developer"
         case .caches: "Cache"
-        case .userFiles: "I tuoi file"
-        case .systemData: "Dati di sistema"
-        case .unattributed: "Non attribuito"
-        case .otherVolumes: "Volumi di sistema"
+        case .userFiles: "Your files"
+        case .systemData: "System data"
+        case .unattributed: "Unattributed"
+        case .otherVolumes: "System volumes"
         }
     }
 
     var explanation: String {
         switch self {
-        case .applications: "La cartella Applicazioni."
-        case .appData: "La Libreria della tua cartella utente, senza cache, backup e strumenti di sviluppo."
-        case .photos: "La cartella Immagini, compresa la libreria Foto."
-        case .iPhoneBackups: "I backup locali di iPhone e iPad."
-        case .developer: "Simulatori e dati di compilazione di Xcode."
-        case .caches: "File temporanei che le app possono ricreare."
-        case .userFiles: "Documenti, Scrivania, Download e il resto della tua cartella."
-        case .systemData: "Cartelle di sistema sul volume dati e altri utenti."
-        case .unattributed: "Almeno questo spazio non è attribuito a nessuna cartella: si trova in cartelle non leggibili o nei metadati del disco. Può essere di più, perché i cloni APFS contano più volte nel totale misurato."
-        case .otherVolumes: "Sistema, Preboot, Recovery e memoria virtuale. Li gestisce macOS."
+        case .applications: "The Applications folder."
+        case .appData: "The Library in your home folder, without caches, backups, and developer tools."
+        case .photos: "The Pictures folder, including the Photos library."
+        case .iPhoneBackups: "Local backups of iPhone and iPad."
+        case .developer: "Xcode simulators and build data."
+        case .caches: "Temporary files that apps can recreate."
+        case .userFiles: "Documents, Desktop, Downloads, and the rest of your home folder."
+        case .systemData: "System folders on the data volume, and other users."
+        case .unattributed: "At least this much space isn't attributed to any folder: it's in unreadable folders or in the disk's metadata. It may be more, because APFS clones count several times in the measured total."
+        case .otherVolumes: "System, Preboot, Recovery, and virtual memory. macOS manages them."
         }
     }
 

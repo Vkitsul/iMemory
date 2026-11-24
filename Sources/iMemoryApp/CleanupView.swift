@@ -14,9 +14,9 @@ struct CleanupView: View {
         VStack(spacing: 0) {
             if shown.isEmpty {
                 ContentUnavailableView(
-                    "Niente da pulire",
+                    "Nothing to clean",
                     systemImage: "checkmark.circle",
-                    description: Text("Le cartelle che iMemory sa pulire in sicurezza sono vuote.")
+                    description: Text("The folders iMemory knows how to clean safely are empty.")
                 )
             } else {
                 List {
@@ -24,14 +24,14 @@ struct CleanupView: View {
                         Section {
                             ForEach(safe) { RuleRow(candidate: $0, model: model) }
                         } header: {
-                            sectionHeader("Sicuro", detail: "Si ricrea senza conseguenze.")
+                            sectionHeader("Safe", detail: "Recreated at no cost.")
                         }
                     }
                     if !review.isEmpty {
                         Section {
                             ForEach(review) { RuleRow(candidate: $0, model: model) }
                         } header: {
-                            sectionHeader("Da valutare", detail: "Si ricrea, ma con un costo: leggi la descrizione.")
+                            sectionHeader("Review first", detail: "Recreated, but at a cost: read the description.")
                         }
                     }
                 }
@@ -66,7 +66,7 @@ struct CleanupView: View {
         return HStack {
             VStack(alignment: .leading, spacing: 1) {
                 if selected.isEmpty {
-                    Text("Nessuna voce selezionata")
+                    Text("No items selected")
                 } else {
                     Text(Format.spaceRange(
                         minimum: selected.map(\.privateBytes).reduce(0, +),
@@ -79,7 +79,7 @@ struct CleanupView: View {
                 }
             }
             Spacer()
-            Button("Pulisci…") {
+            Button("Clean…") {
                 model.phase = .confirming
             }
             .controlSize(.large)
@@ -118,7 +118,7 @@ private struct RuleRow: View {
                 .toggleStyle(.checkbox)
                 .disabled(!blockers.isEmpty)
                 Spacer()
-                Text((candidate.rule.command == nil ? "" : "fino a ") + Format.bytes(candidate.allocated))
+                Text((candidate.rule.command == nil ? "" : "up to ") + Format.bytes(candidate.allocated))
                     .monospacedDigit()
             }
             Text(candidate.rule.explanation)
@@ -128,7 +128,7 @@ private struct RuleRow: View {
                 .padding(.leading, 20)
 
             if !blockers.isEmpty {
-                Label("Chiudi \(blockers.joined(separator: ", ")) per pulire questa voce", systemImage: "exclamationmark.triangle")
+                Label("Quit \(blockers.joined(separator: ", ")) to clean this item", systemImage: "exclamationmark.triangle")
                     .font(.callout)
                     .foregroundStyle(.orange)
                     .padding(.leading, 20)
@@ -138,7 +138,7 @@ private struct RuleRow: View {
                 showsItems.toggle()
             } label: {
                 Label(
-                    candidate.rule.command == nil ? Format.items(candidate.itemCount) : "Cosa esegue",
+                    candidate.rule.command == nil ? Format.items(candidate.itemCount) : "What it runs",
                     systemImage: showsItems ? "chevron.down" : "chevron.right"
                 )
                     .font(.callout)
@@ -147,7 +147,7 @@ private struct RuleRow: View {
             }
             .buttonStyle(.plain)
             .padding(.leading, 20)
-            .accessibilityLabel(showsItems ? "Nascondi le voci" : "Mostra le voci")
+            .accessibilityLabel(showsItems ? "Hide items" : "Show items")
 
             if showsItems {
                 if let command = candidate.rule.command {
@@ -224,9 +224,9 @@ private struct ConfirmationView: View {
         let items = selected.map(\.itemCount).reduce(0, +)
 
         VStack(alignment: .leading, spacing: 14) {
-            Text("Eliminare \(Format.items(items))?")
+            Text("Delete \(Format.items(items))?")
                 .font(.title2.weight(.medium))
-            Text("Vengono eliminate subito e non passano dal Cestino: l'operazione non si può annullare.")
+            Text("They're deleted right away and don't go to the Trash: this can't be undone.")
                 .fixedSize(horizontal: false, vertical: true)
             Text(Format.spaceRange(
                 minimum: selected.map(\.privateBytes).reduce(0, +),
@@ -241,7 +241,7 @@ private struct ConfirmationView: View {
                             HStack {
                                 Text(candidate.rule.title).fontWeight(.medium)
                                 Spacer()
-                                Text((candidate.rule.command == nil ? "" : "fino a ") + Format.bytes(candidate.allocated))
+                                Text((candidate.rule.command == nil ? "" : "up to ") + Format.bytes(candidate.allocated))
                                     .monospacedDigit()
                             }
                             // The last chance to read what it costs, so it can't be left to the list.
@@ -252,7 +252,7 @@ private struct ConfirmationView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             if let command = candidate.rule.command {
-                                Text("Esegue: \(command.displayText)")
+                                Text("Runs: \(command.displayText)")
                                     .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                             }
@@ -272,12 +272,12 @@ private struct ConfirmationView: View {
 
             HStack {
                 Spacer()
-                Button("Annulla", role: .cancel) {
+                Button("Cancel", role: .cancel) {
                     model.phase = .choosing
                 }
                 .keyboardShortcut(.cancelAction)
                 // Not the default action: Return must not delete anything.
-                Button("Elimina \(Format.items(items))", role: .destructive) {
+                Button("Delete \(Format.items(items))", role: .destructive) {
                     model.confirm()
                 }
             }
@@ -292,14 +292,14 @@ private struct RunningView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Text("Eliminazione in corso")
+            Text("Deleting")
                 .font(.title3.weight(.medium))
             ProgressView(value: Double(progress.completedItems), total: Double(max(progress.totalItems, 1)))
-            Text("\(Format.count(progress.completedItems)) di \(Format.count(progress.totalItems)) voci")
+            Text("\(Format.count(progress.completedItems)) of \(Format.count(progress.totalItems)) items")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
-            Button("Interrompi", action: cancel)
+            Button("Stop", action: cancel)
         }
         .padding(24)
     }
@@ -320,11 +320,11 @@ struct ReportView: View {
             .frame(maxHeight: 260)
 
             HStack {
-                Text("Alla chiusura il disco viene scansionato di nuovo.")
+                Text("The disk is scanned again when you close this.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Chiudi", action: close)
+                Button("Close", action: close)
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -339,26 +339,26 @@ struct ReportSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if report.isTrashOperation {
-                Text("\(Format.items(report.removedItemCount)) nel Cestino")
+                Text("\(Format.items(report.removedItemCount)) in the Trash")
                     .font(.title2.weight(.medium))
-                Text("Si possono ripristinare dal Cestino. Lo spazio si libera solo svuotandolo.")
+                Text("You can restore them from the Trash. The space is freed only when you empty it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                Text(report.measuredFreed > 0 ? "\(Format.bytes(report.measuredFreed)) liberati" : "Nessuno spazio liberato in modo misurabile")
+                Text(report.measuredFreed > 0 ? "\(Format.bytes(report.measuredFreed)) freed" : "No measurable space freed")
                     .font(.title2.weight(.medium))
-                Text("Misurati sul disco. Stima prima di eliminare: \(Format.estimate(minimum: report.expectedPrivate, maximum: report.expectedAllocated)).")
+                Text("Measured on disk. Estimate before deleting: \(Format.estimate(minimum: report.expectedPrivate, maximum: report.expectedAllocated)).")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
             if !report.isTrashOperation, report.figuresDiverge {
-                Text("I file eliminati occupavano \(Format.bytes(report.removedBytes)). La differenza può dipendere da altre app che scrivevano sul disco, o da file che condividevano spazio con un clone.")
+                Text("The deleted files took up \(Format.bytes(report.removedBytes)). The difference may come from other apps writing to the disk, or from files that shared space with a clone.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if report.wasCancelled {
-                Text("Interrotta: le voci già eliminate non si recuperano.")
+                Text("Stopped: items already deleted can't be recovered.")
                     .font(.callout)
                     .foregroundStyle(.orange)
             }
@@ -376,11 +376,11 @@ struct ReportDetails: View {
                     HStack {
                         Text(rule.title).fontWeight(.medium)
                         Spacer()
-                        Text("\(report.isTrashOperation ? "Nel Cestino" : "Eliminate"): \(Format.items(rule.removedItems.count))")
+                        Text("\(report.isTrashOperation ? "In the Trash" : "Deleted"): \(Format.items(rule.removedItems.count))")
                             .foregroundStyle(.secondary)
                     }
                     if !rule.blockedBy.isEmpty {
-                        Text("Non eseguita: \(rule.blockedBy.joined(separator: ", ")) era aperto.")
+                        Text("Not run: \(rule.blockedBy.joined(separator: ", ")) was open.")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
@@ -391,7 +391,7 @@ struct ReportDetails: View {
                             .lineLimit(2)
                     }
                     if rule.issues.count > 20 {
-                        Text("E altri \(Format.count(rule.issues.count - 20)) problemi.")
+                        Text("And \(Format.count(rule.issues.count - 20)) more problems.")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }

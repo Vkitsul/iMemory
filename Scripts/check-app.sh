@@ -1,24 +1,24 @@
 #!/bin/bash
-# Avvia l'app, le fa percorrere un giro fisso e scrive i tempi e le schermate.
-# Sola lettura. L'output finisce nella cartella indicata.
+# Launches the app, drives it through a fixed route, and writes timings and screenshots.
+# Read-only on your data. The output goes to the given folder.
 #
-# uso: Scripts/check-app.sh <cartella-di-output>
+# usage: Scripts/check-app.sh <output-folder>
 set -euo pipefail
 
-OUTPUT="${1:?indica una cartella di output}"
+OUTPUT="${1:?give an output folder}"
 PROJECT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="$("$PROJECT/Scripts/build-app.sh")"
 
 rm -rf "$OUTPUT"
 mkdir -p "$OUTPUT"
 
-# L'app chiede una schermata scrivendo un file con il numero della finestra.
+# The app asks for a screenshot by writing a file with its window number.
 (
-    while [ ! -f "$OUTPUT/fine" ]; do
-        for request in "$OUTPUT"/richiesta-*; do
+    while [ ! -f "$OUTPUT/stop" ]; do
+        for request in "$OUTPUT"/request-*; do
             [ -f "$request" ] || continue
-            name="${request##*/richiesta-}"
-            screencapture -x -o -l "$(cat "$request")" "$OUTPUT/$name.png" 2>>"$OUTPUT/catture.log" || true
+            name="${request##*/request-}"
+            screencapture -x -o -l "$(cat "$request")" "$OUTPUT/$name.png" 2>>"$OUTPUT/captures.log" || true
             rm -f "$request"
         done
         sleep 0.1
@@ -27,12 +27,13 @@ mkdir -p "$OUTPUT"
 WATCHER=$!
 
 open -n -W --env IMEMORY_SELFCHECK="$OUTPUT" "$APP"
-touch "$OUTPUT/fine"
+touch "$OUTPUT/stop"
 wait "$WATCHER"
-# L'app scrive "fine" per ultimo: senza, si è fermata prima o è andata in crash.
-if ! grep -q '^fine$' "$OUTPUT/risultati.txt" 2>/dev/null; then
-    echo "ERRORE: il giro non è arrivato in fondo. Controlla ~/Library/Logs/DiagnosticReports" >&2
-    cat "$OUTPUT/risultati.txt" 2>/dev/null
+
+# The app writes "done" last: without it, it stopped early or crashed.
+if ! grep -q '^done$' "$OUTPUT/results.txt" 2>/dev/null; then
+    echo "ERROR: the route didn't finish. Check ~/Library/Logs/DiagnosticReports" >&2
+    cat "$OUTPUT/results.txt" 2>/dev/null
     exit 1
 fi
-cat "$OUTPUT/risultati.txt"
+cat "$OUTPUT/results.txt"

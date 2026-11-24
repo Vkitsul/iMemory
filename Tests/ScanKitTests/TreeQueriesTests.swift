@@ -7,9 +7,9 @@ private func scan(_ fixture: Fixture) async throws -> FileTree {
     try await FileScanner().scan(root: fixture.root).tree
 }
 
-@Suite("Interrogazioni sull'albero")
+@Suite("Tree queries")
 struct TreeQueriesTests {
-    @Test("Un percorso relativo trova il nodo giusto")
+    @Test("A relative path finds the right node")
     func relativePaths() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("a/b c")
@@ -23,70 +23,70 @@ struct TreeQueriesTests {
         #expect(tree.node(atRelativePath: "a/assente") == nil)
     }
 
-    @Test("Le cartelle più grandi saltano quelle che contengono solo un'altra cartella")
+    @Test("Largest folders skip those holding only another folder")
     func largestDirectories() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("involucro/dentro/grande")
-        try fixture.makeDirectory("involucro/dentro/media")
-        try fixture.makeDirectory("piccola")
-        try fixture.makeFile("involucro/dentro/grande/f", size: 3_000_000)
-        try fixture.makeFile("involucro/dentro/media/f", size: 1_000_000)
-        try fixture.makeFile("piccola/f", size: 200_000)
+        try fixture.makeDirectory("wrapper/inside/large")
+        try fixture.makeDirectory("wrapper/inside/medium")
+        try fixture.makeDirectory("little")
+        try fixture.makeFile("wrapper/inside/large/f", size: 3_000_000)
+        try fixture.makeFile("wrapper/inside/medium/f", size: 1_000_000)
+        try fixture.makeFile("little/f", size: 200_000)
 
         let tree = try await scan(fixture)
         let paths = tree.largestDirectories(limit: 3).map(tree.path(of:))
 
         #expect(paths == [
-            fixture.path("involucro/dentro"),
-            fixture.path("involucro/dentro/grande"),
-            fixture.path("involucro/dentro/media"),
+            fixture.path("wrapper/inside"),
+            fixture.path("wrapper/inside/large"),
+            fixture.path("wrapper/inside/medium"),
         ])
     }
 
-    @Test("Le cartelle illeggibili si contano per sottoalbero")
+    @Test("Unreadable folders are counted per subtree")
     func unreadableCount() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("sotto/chiusa")
-        try fixture.makeDirectory("altra/chiusa")
-        #expect(chmod(fixture.path("sotto/chiusa"), 0) == 0)
-        #expect(chmod(fixture.path("altra/chiusa"), 0) == 0)
+        try fixture.makeDirectory("sub/locked")
+        try fixture.makeDirectory("other/locked")
+        #expect(chmod(fixture.path("sub/locked"), 0) == 0)
+        #expect(chmod(fixture.path("other/locked"), 0) == 0)
         defer {
-            chmod(fixture.path("sotto/chiusa"), 0o755)
-            chmod(fixture.path("altra/chiusa"), 0o755)
+            chmod(fixture.path("sub/locked"), 0o755)
+            chmod(fixture.path("other/locked"), 0o755)
         }
 
         let tree = try await scan(fixture)
-        let under = try #require(tree.node(atRelativePath: "sotto"))
+        let under = try #require(tree.node(atRelativePath: "sub"))
 
         #expect(tree.unreadableDirectoryCount(under: under) == 1)
         #expect(tree.unreadableDirectoryCount(under: tree.root) == 2)
     }
 
-    @Test("Le categorie non si sovrappongono e sommano alla capacità")
+    @Test("Categories don't overlap and add up to the capacity")
     func breakdown() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("Applications")
-        try fixture.makeDirectory("Users/io/Library/Caches")
-        try fixture.makeDirectory("Users/io/Library/Developer")
-        try fixture.makeDirectory("Users/io/Library/Application Support/MobileSync")
-        try fixture.makeDirectory("Users/io/Library/Application Support/App")
-        try fixture.makeDirectory("Users/io/Pictures")
-        try fixture.makeDirectory("Users/io/Documents")
+        try fixture.makeDirectory("Users/me/Library/Caches")
+        try fixture.makeDirectory("Users/me/Library/Developer")
+        try fixture.makeDirectory("Users/me/Library/Application Support/MobileSync")
+        try fixture.makeDirectory("Users/me/Library/Application Support/App")
+        try fixture.makeDirectory("Users/me/Pictures")
+        try fixture.makeDirectory("Users/me/Documents")
         try fixture.makeDirectory("private")
         try fixture.makeFile("Applications/f", size: 100_000)
-        try fixture.makeFile("Users/io/Library/Caches/f", size: 200_000)
-        try fixture.makeFile("Users/io/Library/Developer/f", size: 300_000)
-        try fixture.makeFile("Users/io/Library/Application Support/MobileSync/f", size: 400_000)
-        try fixture.makeFile("Users/io/Library/Application Support/App/f", size: 500_000)
-        try fixture.makeFile("Users/io/Pictures/f", size: 600_000)
-        try fixture.makeFile("Users/io/Documents/f", size: 700_000)
+        try fixture.makeFile("Users/me/Library/Caches/f", size: 200_000)
+        try fixture.makeFile("Users/me/Library/Developer/f", size: 300_000)
+        try fixture.makeFile("Users/me/Library/Application Support/MobileSync/f", size: 400_000)
+        try fixture.makeFile("Users/me/Library/Application Support/App/f", size: 500_000)
+        try fixture.makeFile("Users/me/Pictures/f", size: 600_000)
+        try fixture.makeFile("Users/me/Documents/f", size: 700_000)
         try fixture.makeFile("private/f", size: 800_000)
 
         let tree = try await scan(fixture)
         let measured = tree.sizes(of: tree.root).allocated
         let result = StorageBreakdown(
             tree: tree,
-            homePath: "Users/io",
+            homePath: "Users/me",
             total: measured + 5_000_000,
             free: 2_000_000,
             volumeUsed: measured + 1_000_000
@@ -100,10 +100,10 @@ struct TreeQueriesTests {
         }
 
         #expect(bytes(.applications) == (try allocated("Applications")))
-        #expect(bytes(.caches) == (try allocated("Users/io/Library/Caches")))
-        #expect(bytes(.iPhoneBackups) == (try allocated("Users/io/Library/Application Support/MobileSync")))
-        #expect(bytes(.appData) == (try allocated("Users/io/Library/Application Support/App")))
-        #expect(bytes(.userFiles) == (try allocated("Users/io/Documents")))
+        #expect(bytes(.caches) == (try allocated("Users/me/Library/Caches")))
+        #expect(bytes(.iPhoneBackups) == (try allocated("Users/me/Library/Application Support/MobileSync")))
+        #expect(bytes(.appData) == (try allocated("Users/me/Library/Application Support/App")))
+        #expect(bytes(.userFiles) == (try allocated("Users/me/Documents")))
         #expect(bytes(.systemData) == (try allocated("private")))
         #expect(bytes(.unattributed) == 1_000_000)
         #expect(bytes(.otherVolumes) == 2_000_000)
@@ -112,32 +112,32 @@ struct TreeQueriesTests {
     }
 }
 
-@Suite("Confronto fra scansioni")
+@Suite("Comparing scans")
 struct SnapshotTests {
     private func snapshot(_ folders: [String: Int64], unreadable: Int = 0) -> ScanSnapshot {
         ScanSnapshot(date: .now, unreadableDirectories: unreadable, folders: folders)
     }
 
-    @Test("Riporta la sottocartella che spiega la crescita, non i genitori")
+    @Test("Reports the subfolder that explains the growth, not its parents")
     func reportsMostSpecificFolder() throws {
-        let old = snapshot(["Users": 1_000_000_000, "Users/io": 1_000_000_000, "Users/io/Video": 100_000_000])
-        let new = snapshot(["Users": 3_000_000_000, "Users/io": 3_000_000_000, "Users/io/Video": 2_100_000_000])
+        let old = snapshot(["Users": 1_000_000_000, "Users/me": 1_000_000_000, "Users/me/Video": 100_000_000])
+        let new = snapshot(["Users": 3_000_000_000, "Users/me": 3_000_000_000, "Users/me/Video": 2_100_000_000])
 
         let growth = try #require(new.growth(since: old))
 
-        #expect(growth.map(\.path) == ["Users/io/Video"])
+        #expect(growth.map(\.path) == ["Users/me/Video"])
         #expect(growth[0].added == 2_000_000_000)
     }
 
-    @Test("Una cartella nuova conta come crescita e quelle ridotte no")
+    @Test("A new folder counts as growth and shrunk ones don't")
     func newAndShrunkFolders() throws {
-        let old = snapshot(["Ridotta": 900_000_000])
-        let new = snapshot(["Ridotta": 100_000_000, "Nuova": 500_000_000])
+        let old = snapshot(["Shrunk": 900_000_000])
+        let new = snapshot(["Shrunk": 100_000_000, "New": 500_000_000])
 
-        #expect(try #require(new.growth(since: old)).map(\.path) == ["Nuova"])
+        #expect(try #require(new.growth(since: old)).map(\.path) == ["New"])
     }
 
-    @Test("Le crescite piccole non compaiono")
+    @Test("Small growth doesn't show")
     func smallGrowthIsIgnored() throws {
         let new = snapshot(["A": 150_000_000])
         let old = snapshot(["A": 100_000_000])
@@ -145,7 +145,7 @@ struct SnapshotTests {
         #expect(try #require(new.growth(since: old)).isEmpty)
     }
 
-    @Test("Con permessi diversi le scansioni non si confrontano")
+    @Test("Scans with different permissions aren't compared")
     func permissionChange() {
         let old = snapshot(["A": 1_000_000_000], unreadable: 800)
         let new = snapshot(["A": 9_000_000_000], unreadable: 200)
@@ -153,24 +153,24 @@ struct SnapshotTests {
         #expect(new.growth(since: old) == nil)
     }
 
-    @Test("La fotografia registra le cartelle grandi con percorsi relativi")
+    @Test("The snapshot records large folders with relative paths")
     func capturesFromTree() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("grande/dentro")
-        try fixture.makeDirectory("piccola")
-        try fixture.makeFile("grande/dentro/f", size: 3_000_000)
-        try fixture.makeFile("piccola/f", size: 10_000)
+        try fixture.makeDirectory("large/inside")
+        try fixture.makeDirectory("little")
+        try fixture.makeFile("large/inside/f", size: 3_000_000)
+        try fixture.makeFile("little/f", size: 10_000)
 
         let tree = try await FileScanner().scan(root: fixture.root).tree
         let result = ScanSnapshot(tree: tree, unreadableDirectories: 0, minimumBytes: 1_000_000)
 
-        #expect(Set(result.folders.keys) == ["grande", "grande/dentro"])
+        #expect(Set(result.folders.keys) == ["large", "large/inside"])
     }
 }
 
-@Suite("Capacità del volume")
+@Suite("Volume capacity")
 struct VolumeCapacityTests {
-    @Test("Lo spazio del volume non comprende gli altri volumi del contenitore")
+    @Test("The volume's space excludes the container's other volumes")
     func usedExcludesOtherVolumes() throws {
         let capacity = try VolumeCapacity(path: "/System/Volumes/Data")
         let systemVolume = try VolumeCapacity(path: "/")
@@ -186,7 +186,7 @@ struct VolumeCapacityTests {
 struct TreemapTests {
     private static let bounds = CGRect(x: 10, y: 20, width: 800, height: 500)
 
-    @Test("Le aree sono proporzionali ai valori", arguments: [
+    @Test("Areas are proportional to the values", arguments: [
         [100],
         [60, 30, 10],
         [5, 5, 5, 5],
@@ -205,7 +205,7 @@ struct TreemapTests {
         }
     }
 
-    @Test("I rettangoli restano nei limiti e non si sovrappongono")
+    @Test("Rectangles stay in bounds and don't overlap")
     func noOverlap() {
         let values = (1...60).reversed().map { Double($0 * $0) }
         let rects = Treemap.squarify(values, in: Self.bounds)
@@ -223,7 +223,7 @@ struct TreemapTests {
         }
     }
 
-    @Test("I rettangoli non diventano sottili quando basta riorganizzarli")
+    @Test("Rectangles don't get thin when rearranging is enough")
     func reasonableAspectRatio() {
         let rects = Treemap.squarify([40, 30, 20, 10], in: CGRect(x: 0, y: 0, width: 400, height: 400))
         for rect in rects {
@@ -231,21 +231,21 @@ struct TreemapTests {
         }
     }
 
-    @Test("Casi limite: nessun valore, somma nulla, area nulla")
+    @Test("Edge cases: no values, zero sum, zero area")
     func edgeCases() {
         #expect(Treemap.squarify([], in: Self.bounds).isEmpty)
         #expect(Treemap.squarify([0, 0], in: Self.bounds).allSatisfy { $0.width * $0.height == 0 })
         #expect(Treemap.squarify([1], in: .zero).allSatisfy { $0.width * $0.height == 0 })
     }
 
-    @Test("Le voci troppo piccole si raggruppano e i figli annidati stanno nel genitore")
+    @Test("Items too small are grouped and nested children stay inside their parent")
     func cells() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("grande")
-        try fixture.makeFile("grande/uno", size: 4_000_000)
-        try fixture.makeFile("grande/due", size: 2_000_000)
+        try fixture.makeDirectory("large")
+        try fixture.makeFile("large/one", size: 4_000_000)
+        try fixture.makeFile("large/two", size: 2_000_000)
         for index in 0..<50 {
-            try fixture.makeFile("minuscolo\(index)", size: 4096)
+            try fixture.makeFile("tiny\(index)", size: 4096)
         }
 
         let tree = try await scan(fixture)
@@ -266,21 +266,21 @@ struct TreemapTests {
         #expect(parentIndex < firstNested)
     }
 
-    @Test("Una cartella con una sola sottocartella mostra il contenuto più interno")
+    @Test("A folder with a single subfolder shows the innermost contents")
     func dominantSubfolderIsExpanded() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("Users/io")
-        try fixture.makeFile("Users/io/uno", size: 3_000_000)
-        try fixture.makeFile("Users/io/due", size: 1_000_000)
+        try fixture.makeDirectory("Users/me")
+        try fixture.makeFile("Users/me/one", size: 3_000_000)
+        try fixture.makeFile("Users/me/two", size: 1_000_000)
 
         let tree = try await scan(fixture)
         let cells = Treemap.cells(tree: tree, root: tree.root, size: CGSize(width: 400, height: 300))
         let nested = cells.filter { $0.depth == 1 }.compactMap(\.node).map(tree.name(of:))
 
-        #expect(nested == ["uno", "due"])
+        #expect(nested == ["one", "two"])
     }
 
-    @Test("Una cartella enorme produce poche celle")
+    @Test("A huge folder produces few cells")
     func cellCountIsBounded() async throws {
         let fixture = try Fixture()
         for index in 0..<2000 {

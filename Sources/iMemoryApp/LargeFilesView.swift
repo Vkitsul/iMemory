@@ -3,11 +3,11 @@ import AppsKit
 import SwiftUI
 
 private enum FileFilter: String, CaseIterable, Identifiable {
-    case all = "Tutti"
-    case installers = "Installer"
-    case archives = "Archivi"
-    case videos = "Video"
-    case old = "Non modificati da 6 mesi"
+    case all = "All"
+    case installers = "Installers"
+    case archives = "Archives"
+    case videos = "Videos"
+    case old = "Untouched for 6 months"
 
     var id: Self { self }
 
@@ -40,7 +40,7 @@ struct LargeFilesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Mostra", selection: $filter) {
+            Picker("Show", selection: $filter) {
                 ForEach(FileFilter.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -50,9 +50,9 @@ struct LargeFilesView: View {
 
             if visibleFiles.isEmpty {
                 ContentUnavailableView(
-                    "Nessun file oltre 100 MB",
+                    "No files over 100 MB",
                     systemImage: "doc",
-                    description: Text("Nella tua cartella, fuori dalla Libreria e dalle cartelle nascoste, non ci sono file di questo tipo così grandi.")
+                    description: Text("Outside the Library and hidden folders, your home folder has no files of this kind this large.")
                 )
             } else {
                 List(visibleFiles) { file in
@@ -73,7 +73,7 @@ struct LargeFilesView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
                     if chosenFiles.isEmpty {
-                        Text("Nessun file selezionato")
+                        Text("No files selected")
                     } else {
                         Text(Format.bytes(chosenFiles.map(\.allocated).reduce(0, +)))
                             .fontWeight(.medium)
@@ -83,7 +83,7 @@ struct LargeFilesView: View {
                     }
                 }
                 Spacer()
-                Button("Sposta nel Cestino…") {
+                Button("Move to Trash…") {
                     trash.prepareFiles(chosenFiles)
                 }
                 .controlSize(.large)
@@ -104,7 +104,7 @@ private struct FileRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Toggle("Seleziona \(URL(fileURLWithPath: file.path).lastPathComponent)", isOn: $isChosen)
+            Toggle("Select \(URL(fileURLWithPath: file.path).lastPathComponent)", isOn: $isChosen)
                 .toggleStyle(.checkbox)
                 .labelsHidden()
             Image(nsImage: NSWorkspace.shared.icon(forFile: file.path))
@@ -129,7 +129,7 @@ private struct FileRow: View {
         }
         .padding(.vertical, 2)
         .contextMenu {
-            Button("Mostra nel Finder") {
+            Button("Show in Finder") {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: file.path)])
             }
         }

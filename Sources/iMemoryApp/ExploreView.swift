@@ -16,34 +16,34 @@ struct ExploreView: View {
                     .frame(minWidth: 460, maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .searchable(text: $explorer.searchText, placement: .toolbar, prompt: "Cerca in questa cartella")
+        .searchable(text: $explorer.searchText, placement: .toolbar, prompt: "Search this folder")
         .inspector(isPresented: $showsDetails) {
             DetailsPanel(explorer: explorer)
                 .inspectorColumnWidth(min: 220, ideal: 260, max: 340)
         }
         .toolbar {
             ToolbarItem(placement: .navigation) {
-                Button("Cartella superiore", systemImage: "chevron.up") {
+                Button("Enclosing folder", systemImage: "chevron.up") {
                     explorer.goUp()
                 }
                 .keyboardShortcut(.upArrow, modifiers: .command)
                 .disabled(!explorer.canGoUp)
             }
             ToolbarItem {
-                Menu("Filtri", systemImage: filtersActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle") {
-                    Picker("Tipo", selection: $explorer.kindFilter) {
+                Menu("Filters", systemImage: filtersActive ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle") {
+                    Picker("Kind", selection: $explorer.kindFilter) {
                         ForEach(KindFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
-                    Picker("Ultima modifica", selection: $explorer.ageFilter) {
+                    Picker("Last modified", selection: $explorer.ageFilter) {
                         ForEach(AgeFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
-                    Picker("Dimensione", selection: $explorer.sizeFilter) {
+                    Picker("Size", selection: $explorer.sizeFilter) {
                         ForEach(SizeFilter.allCases) { Text($0.rawValue).tag($0) }
                     }
                 }
             }
             ToolbarItem {
-                Button("Dettagli", systemImage: "sidebar.right") {
+                Button("Details", systemImage: "sidebar.right") {
                     showsDetails.toggle()
                 }
             }
@@ -108,7 +108,7 @@ private struct NodeTable: View {
                     .padding(10)
                     .background(.regularMaterial, in: .rect(cornerRadius: 8))
             } else if explorer.visibleRows.isEmpty {
-                ContentUnavailableView("Nessun elemento", systemImage: "line.3.horizontal.decrease.circle", description: Text("La cartella è vuota o i filtri escludono tutto."))
+                ContentUnavailableView("No items", systemImage: "line.3.horizontal.decrease.circle", description: Text("The folder is empty, or the filters hide everything."))
             }
         }
     }
@@ -135,38 +135,38 @@ private struct DetailsPanel: View {
                     .textSelection(.enabled)
                     .lineLimit(6)
             }
-            Section("Dimensioni") {
-                LabeledContent("Su disco", value: Format.bytes(sizes.allocated))
-                    .help("Lo spazio occupato, come lo riporta du.")
-                LabeledContent("Contenuto", value: Format.bytes(sizes.logical))
-                    .help("La lunghezza dei file, senza compressione e senza spazio condiviso.")
-                LabeledContent("Privato", value: Format.bytes(sizes.privateBytes))
-                    .help("Spazio non condiviso con cloni APFS. Eliminando questa voce si libera almeno questo spazio.")
+            Section("Sizes") {
+                LabeledContent("On disk", value: Format.bytes(sizes.allocated))
+                    .help("The space it takes up, as du reports it.")
+                LabeledContent("Content", value: Format.bytes(sizes.logical))
+                    .help("The length of the files, before compression and without shared space.")
+                LabeledContent("Private", value: Format.bytes(sizes.privateBytes))
+                    .help("Space not shared with APFS clones. Deleting this item frees at least this much.")
             }
-            Section("Informazioni") {
-                LabeledContent("Modificato", value: Format.date(tree.modificationDate(of: node)))
+            Section("Info") {
+                LabeledContent("Modified", value: Format.date(tree.modificationDate(of: node)))
                 if tree.kind(of: node) == .directory {
-                    LabeledContent("Elementi", value: Format.count(tree.descendantCount(of: node)))
+                    LabeledContent("Items", value: Format.count(tree.descendantCount(of: node)))
                 }
             }
             if !flags.isEmpty {
-                Section("Note") {
+                Section("Notes") {
                     if flags.contains(.unreadable) {
-                        Text("Non leggibile: il contenuto non è nei totali.")
+                        Text("Unreadable: its content isn't in the totals.")
                     }
                     if flags.contains(.dataless) {
-                        Text("Solo nel cloud: non occupa spazio sul Mac e non è stato scaricato.")
+                        Text("Cloud only: takes no space on this Mac and wasn't downloaded.")
                     }
                     if flags.contains(.hardLinkDuplicate) {
-                        Text("Hard link: lo spazio è contato su un altro percorso.")
+                        Text("Hard link: its space is counted at another path.")
                     }
                     if flags.contains(.mountPoint) {
-                        Text("Qui è montato un altro volume, non misurato.")
+                        Text("Another volume is mounted here, and isn't measured.")
                     }
                 }
             }
             Section {
-                Button("Mostra nel Finder") {
+                Button("Show in Finder") {
                     revealInFinder(tree, node)
                 }
             }

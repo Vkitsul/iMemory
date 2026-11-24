@@ -23,13 +23,13 @@ struct SelfCheck {
         while model.isScanning || model.session == nil {
             // A permission prompt nobody answers must not keep the check running forever.
             if ContinuousClock.now > deadline {
-                report += "scansione ferma dopo 120 s: probabile richiesta di permesso senza risposta\n"
+                report += "scan stalled after 120 s: probably a permission request with no answer\n"
                 write(report)
                 NSApp.terminate(nil)
                 return
             }
             if case .failed(let message) = model.phase {
-                report += "scansione fallita: \(message)\n"
+                report += "scan failed: \(message)\n"
                 write(report)
                 NSApp.terminate(nil)
                 return
@@ -38,7 +38,7 @@ struct SelfCheck {
         }
         guard let session = model.session, let explorer = model.explorer else { return }
         let tree = session.tree
-        report += "voci \(tree.count), scansione \(Format.seconds(session.duration))\n"
+        report += "entries \(tree.count), scan \(Format.seconds(session.duration))\n"
 
         func step(_ name: String, action: () -> Void) async {
             meter.reset()
@@ -49,55 +49,55 @@ struct SelfCheck {
             }
             try? await Task.sleep(for: .milliseconds(150))
             let rows = explorer.visibleRows.count
-            let line = "\(name.padding(toLength: 34, withPad: " ", startingAt: 0)) righe \(String(rows).padding(toLength: 8, withPad: " ", startingAt: 0)) blocco massimo \(Int(meter.worst * 1000)) ms\n"
+            let line = "\(name.padding(toLength: 34, withPad: " ", startingAt: 0)) rows \(String(rows).padding(toLength: 8, withPad: " ", startingAt: 0)) worst stall \(Int(meter.worst * 1000)) ms\n"
             report += line
             write(report)
         }
 
-        await step("panoramica") { model.section = .overview }
-        await snapshot("panoramica")
+        await step("overview") { model.section = .overview }
+        await snapshot("overview")
 
-        await step("apri esplora") { model.section = .explore }
-        await snapshot("esplora-radice")
+        await step("open explore") { model.section = .explore }
+        await snapshot("explore-root")
 
         for level in 1...6 {
             guard let next = explorer.visibleRows.first(where: { $0.kind == .directory })?.id else { break }
-            await step("entra livello \(level)") { explorer.show(next) }
+            await step("enter level \(level)") { explorer.show(next) }
         }
-        await snapshot("esplora-profonda")
+        await snapshot("explore-deep")
 
-        await step("torna su") { explorer.goUp() }
+        await step("go up") { explorer.goUp() }
 
         if let first = explorer.visibleRows.first?.id {
-            await step("seleziona una riga") { explorer.selection = first }
-            await snapshot("esplora-selezione")
-            await step("togli selezione") { explorer.selection = nil }
+            await step("select a row") { explorer.selection = first }
+            await snapshot("explore-selection")
+            await step("clear selection") { explorer.selection = nil }
         }
 
-        await step("torna a panoramica") { model.section = .overview }
-        await step("riapri esplora") { model.section = .explore }
+        await step("back to overview") { model.section = .overview }
+        await step("reopen explore") { model.section = .explore }
 
         let crowded = (0..<tree.count)
             .map { NodeID(index: UInt32($0)) }
             .max { tree.childCount(of: $0) < tree.childCount(of: $1) }
         if let crowded {
-            await step("cartella più affollata") { explorer.show(crowded) }
-            await snapshot("esplora-affollata")
-            await step("ordina per nome") { explorer.sort = RowSort(key: .name, ascending: true) }
-            await step("ordina per data") { explorer.sort = RowSort(key: .modified, ascending: false) }
-            await step("cerca testo") { explorer.searchText = "a" }
-            await step("togli ricerca") { explorer.searchText = "" }
-            await step("ordina per spazio") { explorer.sort = RowSort(key: .allocated, ascending: false) }
+            await step("most crowded folder") { explorer.show(crowded) }
+            await snapshot("explore-crowded")
+            await step("sort by name") { explorer.sort = RowSort(key: .name, ascending: true) }
+            await step("sort by date") { explorer.sort = RowSort(key: .modified, ascending: false) }
+            await step("search text") { explorer.searchText = "a" }
+            await step("clear search") { explorer.searchText = "" }
+            await step("sort by size") { explorer.sort = RowSort(key: .allocated, ascending: false) }
         }
 
-        await step("torna alla radice") { explorer.show(tree.root) }
-        await step("filtro oltre 1 GB") { explorer.sizeFilter = .oneGB }
-        await step("togli filtro") { explorer.sizeFilter = .any }
+        await step("back to root") { explorer.show(tree.root) }
+        await step("filter over 1 GB") { explorer.sizeFilter = .oneGB }
+        await step("clear filter") { explorer.sizeFilter = .any }
 
         if let window = NSApp.windows.first(where: { $0.isVisible }) {
             let frame = window.frame
             for width in stride(from: frame.width, to: frame.width - 300, by: -60) {
-                await step("ridimensiona a \(Int(width))") {
+                await step("resize to \(Int(width))") {
                     window.setFrame(NSRect(x: frame.minX, y: frame.minY, width: width, height: frame.height), display: true)
                 }
             }
@@ -105,37 +105,37 @@ struct SelfCheck {
         }
 
         // Shows the confirmation and goes back. This route must never call `confirm()`.
-        await step("apri pulizia") { model.section = .cleanup }
-        await snapshot("pulizia")
+        await step("open cleanup") { model.section = .cleanup }
+        await snapshot("cleanup")
         if !model.cleanup.selectedCandidates.isEmpty {
-            await step("apri conferma") { model.cleanup.phase = .confirming }
-            await snapshot("pulizia-conferma")
-            await step("annulla conferma") { model.cleanup.phase = .choosing }
+            await step("open confirmation") { model.cleanup.phase = .confirming }
+            await snapshot("cleanup-confirmation")
+            await step("cancel confirmation") { model.cleanup.phase = .choosing }
         }
-        await step("apri sviluppatore") { model.section = .developer }
-        await snapshot("sviluppatore")
+        await step("open developer") { model.section = .developer }
+        await snapshot("developer")
         // Selects a risky rule only to see its confirmation, which is then cancelled.
         let selectionBefore = model.cleanup.selectedIDs
         model.cleanup.selectedIDs.formUnion(model.cleanup.candidates.map(\.id))
-        await step("apri conferma sviluppatore") { model.cleanup.phase = .confirming }
-        await snapshot("sviluppatore-conferma")
-        await step("annulla conferma sviluppatore") { model.cleanup.phase = .choosing }
+        await step("open developer confirmation") { model.cleanup.phase = .confirming }
+        await snapshot("developer-confirmation")
+        await step("cancel developer confirmation") { model.cleanup.phase = .choosing }
         model.cleanup.selectedIDs = selectionBefore
-        await step("apri app") { model.section = .apps }
-        await snapshot("app")
+        await step("open apps") { model.section = .apps }
+        await snapshot("apps")
         if let first = session.apps.first(where: { $0.leftovers.count > 1 }) {
-            await step("apri dettaglio app") { model.trash.selectedAppID = first.id }
+            await step("open app detail") { model.trash.selectedAppID = first.id }
             try? await Task.sleep(for: .seconds(2))
-            await snapshot("app-dettaglio")
-            await step("apri conferma app") { model.trash.prepareUninstall(first) }
-            await snapshot("app-conferma-reale")
-            await step("annulla conferma app") { model.trash.cancel() }
+            await snapshot("app-detail")
+            await step("open app confirmation") { model.trash.prepareUninstall(first) }
+            await snapshot("app-confirmation-real")
+            await step("cancel app confirmation") { model.trash.cancel() }
         }
-        await step("apri file grandi") { model.section = .files }
-        await snapshot("file-grandi")
+        await step("open large files") { model.section = .files }
+        await snapshot("large-files")
         // A real search, which only reads. Its results are looked at and then cancelled.
-        await step("apri duplicati") { model.section = .duplicates }
-        await snapshot("duplicati-inizio")
+        await step("open duplicates") { model.section = .duplicates }
+        await snapshot("duplicates-start")
         let homeInTree = String(NSHomeDirectory().drop { $0 == "/" })
         let searchStart = ContinuousClock.now
         model.duplicates.search(tree: tree, homeInTree: homeInTree)
@@ -144,40 +144,40 @@ struct SelfCheck {
             try? await Task.sleep(for: .milliseconds(100))
         }
         if case .finished(let found) = model.duplicates.phase {
-            report += "duplicati: \(found.groups.count) gruppi, \(Format.bytes(found.groups.map(\.reclaimable).reduce(0, +))) recuperabili, \(found.filesConsidered) file, non leggibili \(found.unreadableFiles), in \(Format.seconds(searchStart.duration(to: .now)))\n"
+            report += "duplicates: \(found.groups.count) groups, \(Format.bytes(found.groups.map(\.reclaimable).reduce(0, +))) recoverable, \(found.filesConsidered) files, unreadable \(found.unreadableFiles), in \(Format.seconds(searchStart.duration(to: .now)))\n"
             let clones = found.groups.flatMap(\.files).filter(\.isClone).count
-            report += "voci che sono cloni: \(clones); gruppi con meno di 2 copie: \(found.groups.filter { $0.copies < 2 }.count)\n"
+            report += "entries that are clones: \(clones); groups with fewer than 2 copies: \(found.groups.filter { $0.copies < 2 }.count)\n"
             if let first = found.groups.first, let file = first.files.first {
                 model.duplicates.selected = [file.id]
                 try? await Task.sleep(for: .milliseconds(400))
-                await snapshot("duplicati")
+                await snapshot("duplicates")
                 if let selection = try? DuplicateSelection(groups: found.groups, selected: [file.id]) {
-                    await step("apri conferma duplicati") { model.trash.prepareDuplicates(selection) }
-                    await snapshot("duplicati-conferma")
-                    await step("annulla conferma duplicati") { model.trash.cancel() }
+                    await step("open duplicates confirmation") { model.trash.prepareDuplicates(selection) }
+                    await snapshot("duplicates-confirmation")
+                    await step("cancel duplicates confirmation") { model.trash.cancel() }
                 }
                 model.duplicates.selected = []
             } else {
-                await snapshot("duplicati")
+                await snapshot("duplicates")
             }
         }
-        await step("apri automazione") { model.section = .automation }
-        await snapshot("automazione")
-        report += "pulizia programmata attiva: \(model.automation.settings.cleansOnSchedule), dovuta: \(model.automation.isCleanupDue)\n"
-        await step("apri cronologia") { model.section = .history }
-        await snapshot("cronologia")
+        await step("open automation") { model.section = .automation }
+        await snapshot("automation")
+        report += "scheduled cleanup on: \(model.automation.settings.cleansOnSchedule), due: \(model.automation.isCleanupDue)\n"
+        await step("open history") { model.section = .history }
+        await snapshot("history")
 
         report += await fakeCleanup()
         report += await fakeUninstall()
-        report += "app: \(session.apps.count); con ultimo utilizzo noto: \(session.apps.filter { $0.lastUsed != nil }.count); file grandi: \(session.largeFiles.count)\n"
+        report += "apps: \(session.apps.count); with known last use: \(session.apps.filter { $0.lastUsed != nil }.count); large files: \(session.largeFiles.count)\n"
         for app in session.apps.sorted(by: { $0.allocated > $1.allocated }).prefix(5) {
             let estimate = RecoveryEstimator.estimate(paths: [app.path])
-            report += "  \(app.name): occupa \(Format.bytes(app.allocated)), privato \(Format.bytes(app.privateBytes)), torna \(Format.bytes(estimate.recoverable)), non letti \(estimate.unreadableFolders)\n"
+            report += "  \(app.name): takes \(Format.bytes(app.allocated)), private \(Format.bytes(app.privateBytes)), returns \(Format.bytes(estimate.recoverable)), unread \(estimate.unreadableFolders)\n"
         }
 
-        report += "pulizia: \(model.cleanup.candidates.map { "\($0.id) \(Format.bytes($0.allocated)) in \($0.itemCount) voci" }.joined(separator: "; "))\n"
-        report += "selezionate di partenza: \(model.cleanup.selectedIDs.sorted().joined(separator: ", "))\n"
-        report += "memoria residente \(Format.bytes(residentBytes()))\nfine\n"
+        report += "cleanup: \(model.cleanup.candidates.map { "\($0.id) \(Format.bytes($0.allocated)) in \($0.itemCount) items" }.joined(separator: "; "))\n"
+        report += "selected by default: \(model.cleanup.selectedIDs.sorted().joined(separator: ", "))\n"
+        report += "resident memory \(Format.bytes(residentBytes()))\ndone\n"
         write(report)
         NSApp.terminate(nil)
     }
@@ -186,8 +186,8 @@ struct SelfCheck {
     /// a fake home inside the output folder. Never reaches the real home: the model and
     /// the executor only know the fake one.
     private func fakeCleanup() async -> String {
-        let fakeHome = output + "/casa-finta"
-        let cache = fakeHome + "/Library/Caches/ProvaIMemory"
+        let fakeHome = output + "/fake-home"
+        let cache = fakeHome + "/Library/Caches/SampleIMemory"
         let realCleanup = model.cleanup
         defer { model.cleanup = realCleanup }
 
@@ -199,10 +199,10 @@ struct SelfCheck {
             }
             let rule = CleaningRule(
                 id: "prova",
-                title: "Cache di prova",
-                explanation: "File creati per il controllo automatico.",
+                title: "Sample cache",
+                explanation: "Files created for the automated check.",
                 level: .safe,
-                roots: ["~/Library/Caches/ProvaIMemory"]
+                roots: ["~/Library/Caches/SampleIMemory"]
             )
             let tree = try await FileScanner().scan(root: fakeHome).tree
             let candidates = CleanupPlanner.candidates(
@@ -227,22 +227,22 @@ struct SelfCheck {
                 try await Task.sleep(for: .milliseconds(50))
             }
             try await Task.sleep(for: .milliseconds(400))
-            await snapshot("pulizia-report")
+            await snapshot("cleanup-report")
 
-            guard case .finished(let result) = probe.phase else { return "pulizia finta: stato inatteso\n" }
+            guard case .finished(let result) = probe.phase else { return "fake cleanup: unexpected state\n" }
             probe.phase = .choosing
             model.section = .history
             try await Task.sleep(for: .milliseconds(400))
-            await snapshot("cronologia-piena")
+            await snapshot("history-full")
 
             let remaining = (try? FileManager.default.contentsOfDirectory(atPath: cache))?.count ?? -1
             return """
-            pulizia finta: voci eliminate \(result.removedItemCount), rimaste \(remaining), problemi \(result.issueCount), \
-            attesi \(Format.bytes(result.expectedAllocated)), misurati \(Format.bytes(result.measuredFreed)), voci in cronologia \(probe.history.count)
+            fake cleanup: deleted \(result.removedItemCount), left \(remaining), problems \(result.issueCount), \
+            expected \(Format.bytes(result.expectedAllocated)), measured \(Format.bytes(result.measuredFreed)), history entries \(probe.history.count)
 
             """
         } catch {
-            return "pulizia finta fallita: \(error)\n"
+            return "fake cleanup failed: \(error)\n"
         }
     }
 
@@ -250,10 +250,10 @@ struct SelfCheck {
     /// The Trash here is a folder inside the fake home, so the real one is never touched.
     private func fakeUninstall() async -> String {
         // Laid out like the real disk, with the home below the root.
-        let fakeRoot = output + "/casa-finta-app"
-        let fakeHome = fakeRoot + "/Users/prova"
-        let fakeTrash = fakeRoot + "/CestinoFinto"
-        let bundle = fakeRoot + "/Applications/ProvaIMemory.app"
+        let fakeRoot = output + "/fake-home-apps"
+        let fakeHome = fakeRoot + "/Users/sample"
+        let fakeTrash = fakeRoot + "/FakeTrash"
+        let bundle = fakeRoot + "/Applications/SampleIMemory.app"
         let realTrash = model.trash
         defer {
             model.trash = realTrash
@@ -262,22 +262,22 @@ struct SelfCheck {
         do {
             let manager = FileManager.default
             try manager.createDirectory(atPath: bundle + "/Contents", withIntermediateDirectories: true)
-            try manager.createDirectory(atPath: fakeHome + "/Library/Caches/local.prova.imemory", withIntermediateDirectories: true)
-            try manager.createDirectory(atPath: fakeHome + "/Library/Application Support/ProvaIMemory", withIntermediateDirectories: true)
+            try manager.createDirectory(atPath: fakeHome + "/Library/Caches/local.sample.imemory", withIntermediateDirectories: true)
+            try manager.createDirectory(atPath: fakeHome + "/Library/Application Support/SampleIMemory", withIntermediateDirectories: true)
             try manager.createDirectory(atPath: fakeTrash, withIntermediateDirectories: true)
             let plist = try PropertyListSerialization.data(fromPropertyList: [
-                "CFBundleIdentifier": "local.prova.imemory",
-                "CFBundleName": "ProvaIMemory",
-                "CFBundleExecutable": "ProvaIMemory",
+                "CFBundleIdentifier": "local.sample.imemory",
+                "CFBundleName": "SampleIMemory",
+                "CFBundleExecutable": "SampleIMemory",
             ], format: .xml, options: 0)
             try plist.write(to: URL(fileURLWithPath: bundle + "/Contents/Info.plist"))
-            try Data(count: 5_000_000).write(to: URL(fileURLWithPath: bundle + "/Contents/dati"))
-            try Data(count: 1_000_000).write(to: URL(fileURLWithPath: fakeHome + "/Library/Caches/local.prova.imemory/c"))
-            try Data(count: 1_000_000).write(to: URL(fileURLWithPath: fakeHome + "/Library/Application Support/ProvaIMemory/d"))
+            try Data(count: 5_000_000).write(to: URL(fileURLWithPath: bundle + "/Contents/data"))
+            try Data(count: 1_000_000).write(to: URL(fileURLWithPath: fakeHome + "/Library/Caches/local.sample.imemory/c"))
+            try Data(count: 1_000_000).write(to: URL(fileURLWithPath: fakeHome + "/Library/Application Support/SampleIMemory/d"))
 
             let tree = try await FileScanner().scan(root: fakeRoot).tree
-            let apps = AppFinder.apps(tree: tree, appFolders: ["Applications"], homeInTree: "Users/prova", realRoot: fakeRoot) { _ in nil }
-            guard let app = apps.first else { return "disinstallazione finta: app non trovata\n" }
+            let apps = AppFinder.apps(tree: tree, appFolders: ["Applications"], homeInTree: "Users/sample", realRoot: fakeRoot) { _ in nil }
+            guard let app = apps.first else { return "fake uninstall: app not found\n" }
 
             let probe = TrashModel(
                 policy: TrashPolicy(home: fakeHome, appFolders: [fakeRoot + "/Applications"]),
@@ -293,7 +293,7 @@ struct SelfCheck {
 
             probe.prepareUninstall(app)
             try await Task.sleep(for: .seconds(1))
-            await snapshot("app-conferma")
+            await snapshot("app-confirmation")
             probe.confirm()
 
             while true {
@@ -306,19 +306,19 @@ struct SelfCheck {
 
             let moved = (try? manager.contentsOfDirectory(atPath: fakeTrash).sorted()) ?? []
             return """
-            disinstallazione finta: app rimossa \(!manager.fileExists(atPath: bundle)), nel cestino finto \(moved), \
-            cache rimossa \(!manager.fileExists(atPath: fakeHome + "/Library/Caches/local.prova.imemory")), \
-            dati rimasti \(manager.fileExists(atPath: fakeHome + "/Library/Application Support/ProvaIMemory")), \
-            problemi \(finished?.issueCount ?? -1)
+            fake uninstall: app removed \(!manager.fileExists(atPath: bundle)), in fake trash \(moved), \
+            cache removed \(!manager.fileExists(atPath: fakeHome + "/Library/Caches/local.sample.imemory")), \
+            data kept \(manager.fileExists(atPath: fakeHome + "/Library/Application Support/SampleIMemory")), \
+            problems \(finished?.issueCount ?? -1)
 
             """
         } catch {
-            return "disinstallazione finta fallita: \(error)\n"
+            return "fake uninstall failed: \(error)\n"
         }
     }
 
     private func write(_ report: String) {
-        try? report.write(toFile: output + "/risultati.txt", atomically: true, encoding: .utf8)
+        try? report.write(toFile: output + "/results.txt", atomically: true, encoding: .utf8)
     }
 
     /// Asks whoever runs the check to capture the window, because capturing from inside
@@ -328,7 +328,7 @@ struct SelfCheck {
     private func snapshot(_ name: String) async {
         guard let window = NSApp.windows.first(where: { $0.isVisible && $0.sheetParent == nil }) else { return }
         let image = output + "/\(name).png"
-        let request = output + "/richiesta-\(name)"
+        let request = output + "/request-\(name)"
 
         for _ in 0..<3 where !FileManager.default.fileExists(atPath: image) {
             try? String(window.windowNumber).write(toFile: request, atomically: true, encoding: .utf8)

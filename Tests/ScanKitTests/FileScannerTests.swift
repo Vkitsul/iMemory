@@ -79,18 +79,18 @@ private func scan(_ fixture: Fixture, threads: Int = 4, excluded: Set<String> = 
 
 private func kilobytes(_ bytes: Int64) -> Int64 { (bytes + 1023) / 1024 }
 
-@Suite("Scansione")
+@Suite("Scanning")
 struct FileScannerTests {
-    @Test("Il totale coincide con du su un albero misto")
+    @Test("The total matches du on a mixed tree")
     func matchesDu() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("a/b/c")
         try fixture.makeDirectory("vuota")
         try fixture.makeFile("zero", size: 0)
-        try fixture.makeFile("piccolo", size: 1)
+        try fixture.makeFile("small", size: 1)
         try fixture.makeFile("a/quattro-kb", size: 4097)
         try fixture.makeFile("a/b/un-mega", size: 1_048_576)
-        try fixture.makeFile("a/b/c/due-mega", size: 2_097_152)
+        try fixture.makeFile("a/b/c/two-mega", size: 2_097_152)
 
         let result = try await scan(fixture)
 
@@ -100,12 +100,12 @@ struct FileScannerTests {
         #expect(result.statistics.errorCounts.isEmpty)
     }
 
-    @Test("I totali delle cartelle sommano i figli")
+    @Test("Folder totals add up their children")
     func aggregates() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("a/b")
-        try fixture.makeFile("a/uno", size: 100_000)
-        try fixture.makeFile("a/b/due", size: 200_000)
+        try fixture.makeFile("a/one", size: 100_000)
+        try fixture.makeFile("a/b/two", size: 200_000)
 
         let tree = try await scan(fixture).tree
 
@@ -116,27 +116,27 @@ struct FileScannerTests {
         #expect(tree.descendantCount(of: tree.root) == 4)
     }
 
-    @Test("I figli sono ordinati dal più grande, poi per nome")
+    @Test("Children are sorted largest first, then by name")
     func childOrder() async throws {
         let fixture = try Fixture()
-        try fixture.makeFile("piccolo", size: 10_000)
-        try fixture.makeFile("grande", size: 500_000)
-        try fixture.makeFile("zzz-vuoto", size: 0)
-        try fixture.makeFile("aaa-vuoto", size: 0)
+        try fixture.makeFile("small", size: 10_000)
+        try fixture.makeFile("large", size: 500_000)
+        try fixture.makeFile("zzz-empty", size: 0)
+        try fixture.makeFile("aaa-empty", size: 0)
 
         let tree = try await scan(fixture).tree
 
-        #expect(tree.children(of: tree.root).map(tree.name(of:)) == ["grande", "piccolo", "aaa-vuoto", "zzz-vuoto"])
+        #expect(tree.children(of: tree.root).map(tree.name(of:)) == ["large", "small", "aaa-empty", "zzz-empty"])
     }
 
-    @Test("Un file con più hard link si conta una volta, come du")
+    @Test("A file with several hard links counts once, as in du")
     func hardLinks() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("x")
         try fixture.makeDirectory("y")
-        try fixture.makeFile("x/originale", size: 1_000_000)
-        try FileManager.default.linkItem(atPath: fixture.path("x/originale"), toPath: fixture.path("y/collegamento"))
-        try FileManager.default.linkItem(atPath: fixture.path("x/originale"), toPath: fixture.path("secondo"))
+        try fixture.makeFile("x/original", size: 1_000_000)
+        try FileManager.default.linkItem(atPath: fixture.path("x/original"), toPath: fixture.path("y/link"))
+        try FileManager.default.linkItem(atPath: fixture.path("x/original"), toPath: fixture.path("second"))
 
         let result = try await scan(fixture)
         let tree = result.tree
@@ -144,15 +144,15 @@ struct FileScannerTests {
         #expect(kilobytes(tree.sizes(of: tree.root).allocated) == (try fixture.duKilobytes()))
         #expect(result.statistics.hardLinkDuplicates == 2)
 
-        // Il proprietario è il percorso minore: "secondo" viene prima di "x/originale".
-        let owner = try #require(tree.node(at: "secondo", under: fixture))
-        let duplicate = try #require(tree.node(at: "x/originale", under: fixture))
+        // The owner is the smallest path: "second" sorts before "x/original".
+        let owner = try #require(tree.node(at: "second", under: fixture))
+        let duplicate = try #require(tree.node(at: "x/original", under: fixture))
         #expect(tree.sizes(of: owner).allocated > 0)
         #expect(tree.sizes(of: duplicate).allocated == 0)
         #expect(tree.flags(of: duplicate).contains(.hardLinkDuplicate))
     }
 
-    @Test("Il risultato non dipende dal numero di thread")
+    @Test("The result doesn't depend on the number of threads")
     func deterministic() async throws {
         let fixture = try Fixture()
         for index in 0..<40 {
@@ -168,14 +168,14 @@ struct FileScannerTests {
         }
     }
 
-    @Test("Un link simbolico non viene seguito")
+    @Test("A symbolic link isn't followed")
     func symlinks() async throws {
         let outside = try Fixture()
         try outside.makeFile("enorme", size: 5_000_000)
 
         let fixture = try Fixture()
         try fixture.makeFile("vero", size: 10_000)
-        try FileManager.default.createSymbolicLink(atPath: fixture.path("fuori"), withDestinationPath: outside.root)
+        try FileManager.default.createSymbolicLink(atPath: fixture.path("outside"), withDestinationPath: outside.root)
 
         let result = try await scan(fixture)
         let tree = result.tree
@@ -183,83 +183,83 @@ struct FileScannerTests {
         #expect(result.statistics.symlinks == 1)
         #expect(tree.sizes(of: tree.root).allocated < 1_000_000)
         #expect(kilobytes(tree.sizes(of: tree.root).allocated) == (try fixture.duKilobytes()))
-        #expect(tree.node(at: "fuori/enorme", under: fixture) == nil)
+        #expect(tree.node(at: "outside/enorme", under: fixture) == nil)
     }
 
-    @Test("Un file sparso ha più dimensione logica che allocata")
+    @Test("A sparse file has more logical than allocated size")
     func sparseFile() async throws {
         let fixture = try Fixture()
-        let descriptor = open(fixture.path("sparso"), O_CREAT | O_WRONLY, 0o644)
+        let descriptor = open(fixture.path("sparse"), O_CREAT | O_WRONLY, 0o644)
         try #require(descriptor >= 0)
         #expect(ftruncate(descriptor, 100_000_000) == 0)
         close(descriptor)
 
         let tree = try await scan(fixture).tree
-        let node = try #require(tree.node(at: "sparso", under: fixture))
+        let node = try #require(tree.node(at: "sparse", under: fixture))
 
         #expect(tree.sizes(of: node).logical == 100_000_000)
         #expect(tree.sizes(of: node).allocated < 1_000_000)
         #expect(kilobytes(tree.sizes(of: tree.root).allocated) == (try fixture.duKilobytes()))
     }
 
-    @Test("Un clone APFS risulta condiviso, non privato")
+    @Test("An APFS clone shows as shared, not private")
     func clones() async throws {
         let fixture = try Fixture()
-        try fixture.makeFile("originale", size: 1_000_000)
-        #expect(clonefile(fixture.path("originale"), fixture.path("clone"), 0) == 0)
-        try fixture.makeFile("normale", size: 1_000_000)
+        try fixture.makeFile("original", size: 1_000_000)
+        #expect(clonefile(fixture.path("original"), fixture.path("clone"), 0) == 0)
+        try fixture.makeFile("plain", size: 1_000_000)
 
         let tree = try await scan(fixture).tree
         let clone = try #require(tree.node(at: "clone", under: fixture))
-        let normal = try #require(tree.node(at: "normale", under: fixture))
+        let normal = try #require(tree.node(at: "plain", under: fixture))
 
         #expect(tree.sizes(of: clone).allocated >= 1_000_000)
         #expect(tree.sizes(of: clone).privateBytes == 0)
         #expect(tree.sizes(of: normal).privateBytes == tree.sizes(of: normal).allocated)
     }
 
-    @Test("Una cartella illeggibile è segnalata e la scansione continua")
+    @Test("An unreadable folder is reported and the scan goes on")
     func unreadableDirectory() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("chiusa")
-        try fixture.makeFile("chiusa/segreto", size: 10_000)
-        try fixture.makeFile("aperto", size: 10_000)
-        #expect(chmod(fixture.path("chiusa"), 0) == 0)
-        defer { chmod(fixture.path("chiusa"), 0o755) }
+        try fixture.makeDirectory("locked")
+        try fixture.makeFile("locked/secret", size: 10_000)
+        try fixture.makeFile("open", size: 10_000)
+        #expect(chmod(fixture.path("locked"), 0) == 0)
+        defer { chmod(fixture.path("locked"), 0o755) }
 
         let result = try await scan(fixture)
         let tree = result.tree
-        let closed = try #require(tree.node(at: "chiusa", under: fixture))
+        let closed = try #require(tree.node(at: "locked", under: fixture))
 
         #expect(tree.flags(of: closed).contains(.unreadable))
         #expect(result.statistics.unreadableDirectories == 1)
         #expect(result.statistics.errorCounts[EACCES] == 1)
-        #expect(tree.node(at: "aperto", under: fixture) != nil)
+        #expect(tree.node(at: "open", under: fixture) != nil)
     }
 
-    @Test("La data di modifica e l'identificativo sono letti correttamente")
+    @Test("The modification date and identifier are read correctly")
     func metadata() async throws {
         let fixture = try Fixture()
-        try fixture.makeFile("datato", size: 100)
+        try fixture.makeFile("dated", size: 100)
         var times = [
             timeval(tv_sec: 1_000_000_000, tv_usec: 0),
             timeval(tv_sec: 1_100_000_000, tv_usec: 0),
         ]
-        #expect(utimes(fixture.path("datato"), &times) == 0)
+        #expect(utimes(fixture.path("dated"), &times) == 0)
         var info = stat()
-        #expect(stat(fixture.path("datato"), &info) == 0)
+        #expect(stat(fixture.path("dated"), &info) == 0)
 
         let tree = try await scan(fixture).tree
-        let node = try #require(tree.node(at: "datato", under: fixture))
+        let node = try #require(tree.node(at: "dated", under: fixture))
 
         #expect(tree.modificationDate(of: node).timeIntervalSince1970 == 1_100_000_000)
         #expect(tree.fileID(of: node) == info.st_ino)
     }
 
-    @Test("I nomi con caratteri non ASCII restano intatti")
+    @Test("Names with non-ASCII characters stay intact")
     func unicodeNames() async throws {
         let fixture = try Fixture()
-        let names = ["perché è così", "日本語のファイル", "con spazi e 'apici'", "riga\nnuova", String(repeating: "à", count: 120)]
+        let names = ["naïve café résumé", "日本語のファイル", "with spaces and 'quotes'", "line\nbreak", String(repeating: "à", count: 120)]
         for name in names {
             try fixture.makeFile(name, size: 10)
         }
@@ -273,7 +273,7 @@ struct FileScannerTests {
         #expect(found.count == names.count)
     }
 
-    @Test("I percorsi oltre PATH_MAX vengono letti")
+    @Test("Paths beyond PATH_MAX are read")
     func deepPaths() async throws {
         let fixture = try Fixture()
         let component = String(repeating: "p", count: 200)
@@ -286,7 +286,7 @@ struct FileScannerTests {
             try #require(next >= 0)
             descriptor = next
         }
-        let file = openat(descriptor, "in-fondo", O_CREAT | O_WRONLY, 0o644)
+        let file = openat(descriptor, "at-the-bottom", O_CREAT | O_WRONLY, 0o644)
         try #require(file >= 0)
         var bytes = [UInt8](repeating: 0, count: 50_000)
         arc4random_buf(&bytes, bytes.count)
@@ -301,29 +301,29 @@ struct FileScannerTests {
         #expect(result.statistics.errorCounts.isEmpty)
         #expect(result.statistics.directories == 31)
         #expect(result.statistics.files == 1)
-        // Il riferimento è stat e non du, che qui si ferma con "File name too long" e riporta 0.
+        // The reference is stat, not du, which stops here with "File name too long" and reports 0.
         #expect(result.tree.sizes(of: result.tree.root).allocated == info.st_blocks * 512)
     }
 
-    @Test("Le voci escluse non vengono visitate né conteggiate")
+    @Test("Excluded entries are neither visited nor counted")
     func exclusions() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("tieni")
-        try fixture.makeDirectory("tieni/Nuvola/dentro")
-        try fixture.makeFile("tieni/Nuvola/dentro/grande", size: 1_000_000)
-        try fixture.makeFile("tieni/piccolo", size: 1_000)
+        try fixture.makeDirectory("keep")
+        try fixture.makeDirectory("keep/Cloud/inside")
+        try fixture.makeFile("keep/Cloud/inside/large", size: 1_000_000)
+        try fixture.makeFile("keep/small", size: 1_000)
 
-        let result = try await scan(fixture, excluded: ["Nuvola"])
+        let result = try await scan(fixture, excluded: ["Cloud"])
         let tree = result.tree
 
         #expect(result.statistics.excludedItems == 1)
         #expect(tree.sizes(of: tree.root).allocated < 1_000_000)
-        #expect(tree.node(at: "tieni/Nuvola/dentro", under: fixture) == nil)
-        let excluded = try #require(tree.node(at: "tieni/Nuvola", under: fixture))
+        #expect(tree.node(at: "keep/Cloud/inside", under: fixture) == nil)
+        let excluded = try #require(tree.node(at: "keep/Cloud", under: fixture))
         #expect(tree.flags(of: excluded).contains(.excluded))
     }
 
-    @Test("Una radice non valida produce un errore chiaro")
+    @Test("An invalid root gives a clear error")
     func invalidRoots() async throws {
         let fixture = try Fixture()
         try fixture.makeFile("file", size: 10)
@@ -336,7 +336,7 @@ struct FileScannerTests {
         }
     }
 
-    @Test("L'annullamento interrompe la scansione")
+    @Test("Cancelling stops the scan")
     func cancellation() async throws {
         let fixture = try Fixture()
         try fixture.makeFile("file", size: 10)
@@ -348,18 +348,18 @@ struct FileScannerTests {
         }
     }
 
-    @Test("L'annullamento funziona anche con una cartella bloccata")
+    @Test("Cancelling works even with a blocked folder")
     func cancellationWhileBlocked() async throws {
         let fixture = try Fixture()
-        try fixture.makeDirectory("bloccata")
-        try fixture.makeFile("bloccata/f", size: 10)
+        try fixture.makeDirectory("blocked")
+        try fixture.makeFile("blocked/f", size: 10)
 
-        // Come open() mentre macOS aspetta la risposta a una richiesta di permesso.
+        // Like open() while macOS waits for an answer to a permission request.
         let release = DispatchSemaphore(value: 0)
         let reached = Mutex(false)
         var options = ScanOptions(threadCount: 2)
         options.beforeOpeningFolder = { path in
-            if path.hasSuffix("/bloccata") {
+            if path.hasSuffix("/blocked") {
                 reached.withLock { $0 = true }
                 release.wait()
             }
@@ -378,7 +378,7 @@ struct FileScannerTests {
         #expect(start.duration(to: .now) < .seconds(2))
     }
 
-    @Test("Annullare due volte, o a scansione finita, non crea problemi")
+    @Test("Cancelling twice, or after the scan ends, does no harm")
     func repeatedCancellation() async throws {
         let fixture = try Fixture()
         try fixture.makeFile("f", size: 10)
@@ -389,7 +389,7 @@ struct FileScannerTests {
         scanner.cancel()
     }
 
-    @Test("L'avanzamento riflette le voci trovate")
+    @Test("Progress reflects the items found")
     func progress() async throws {
         let fixture = try Fixture()
         try fixture.makeDirectory("a")

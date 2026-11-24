@@ -7,9 +7,9 @@ struct HistoryView: View {
     var body: some View {
         if history.isEmpty {
             ContentUnavailableView(
-                "Nessuna pulizia",
+                "No cleanups yet",
                 systemImage: "clock",
-                description: Text("Qui compare ogni pulizia, con le voci eliminate e lo spazio misurato.")
+                description: Text("Every cleanup shows up here, with the items deleted and the space measured.")
             )
         } else {
             List(history) { report in
@@ -25,7 +25,7 @@ struct HistoryView: View {
                                     .truncationMode(.middle)
                             }
                             if rule.removedItems.count > 200 {
-                                Text("E altre \(Format.count(rule.removedItems.count - 200)) voci.")
+                                Text("And \(Format.count(rule.removedItems.count - 200)) more items.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -35,16 +35,16 @@ struct HistoryView: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(Format.dateTime(report.date) + (report.wasScheduled == true ? ", programmata" : ""))
+                            Text(Format.dateTime(report.date) + (report.wasScheduled == true ? ", scheduled" : ""))
                                 .fontWeight(.medium)
                             Text(report.isTrashOperation
-                                ? "Nel Cestino: \(Format.items(report.removedItemCount)), \(report.rules.first?.title ?? "")"
-                                : "Eliminate: \(Format.items(report.removedItemCount)), stima \(Format.estimate(minimum: report.expectedPrivate, maximum: report.expectedAllocated))")
+                                ? "In the Trash: \(Format.items(report.removedItemCount)), \(report.rules.first?.title ?? "")"
+                                : "Deleted: \(Format.items(report.removedItemCount)), estimate \(Format.estimate(minimum: report.expectedPrivate, maximum: report.expectedAllocated))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(report.isTrashOperation ? "Cestino" : report.measuredFreed > 0 ? Format.bytes(report.measuredFreed) : "–")
+                        Text(report.isTrashOperation ? "Trash" : report.measuredFreed > 0 ? Format.bytes(report.measuredFreed) : "–")
                             .monospacedDigit()
                     }
                 }

@@ -2,20 +2,20 @@ import Foundation
 import ScanKit
 
 let usage = """
-uso: imemory-scan [percorso] [opzioni]
+usage: imemory-scan [path] [options]
 
-Misura una cartella senza modificare nulla. Percorso predefinito: /System/Volumes/Data
+Measures a folder without changing anything. Default path: /System/Volumes/Data
 
-  --threads N        thread di lettura (predefinito: \(ScanOptions.defaultThreadCount))
-  --top N            cartelle più grandi da mostrare (predefinito: 15)
-  --exclude-name X   salta le voci con questo nome (ripetibile)
-  --du-depth N       stampa le cartelle fino a questa profondità, nel formato di `du -k`
-  --help             mostra questo aiuto
+  --threads N        reading threads (default: \(ScanOptions.defaultThreadCount))
+  --top N            largest folders to show (default: 15)
+  --exclude-name X   skip entries with this name (repeatable)
+  --du-depth N       print folders down to this depth, in the format of `du -k`
+  --help             show this help
 
 """
 
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write(Data("errore: \(message)\n\n\(usage)".utf8))
+    FileHandle.standardError.write(Data("error: \(message)\n\n\(usage)".utf8))
     exit(2)
 }
 
@@ -30,7 +30,7 @@ var arguments = Array(CommandLine.arguments.dropFirst())[...]
 @MainActor
 func integerValue(for option: String) -> Int {
     guard let raw = arguments.popFirst(), let value = Int(raw), value >= 0 else {
-        fail("\(option) richiede un numero")
+        fail("\(option) needs a number")
     }
     return value
 }
@@ -44,13 +44,13 @@ while let argument = arguments.popFirst() {
     case "--du-depth":
         duDepth = integerValue(for: argument)
     case "--exclude-name":
-        guard let name = arguments.popFirst() else { fail("--exclude-name richiede un nome") }
+        guard let name = arguments.popFirst() else { fail("--exclude-name needs a name") }
         excludedNames.insert(name)
     case "--help", "-h":
         print(usage)
         exit(0)
     default:
-        if argument.hasPrefix("-") { fail("opzione sconosciuta \(argument)") }
+        if argument.hasPrefix("-") { fail("unknown option \(argument)") }
         root = argument
     }
 }
@@ -93,32 +93,32 @@ func printSummary(_ result: ScanResult) {
     let elapsed = seconds(result.duration)
     let log: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }
 
-    log("Percorso      \(tree.path(of: tree.root))")
-    log("Allocato      \(formatted(sizes.allocated))  (\(sizes.allocated) byte)")
-    log("Logico        \(formatted(sizes.logical))")
-    log("Privato       \(formatted(sizes.privateBytes))")
-    log("Voci          \(tree.count) in \(String(format: "%.2f", elapsed)) s, \(Int(Double(tree.count) / max(elapsed, 0.001))) al secondo")
-    log("  file \(statistics.files), cartelle \(statistics.directories), link simbolici \(statistics.symlinks), altro \(statistics.otherItems)")
-    log("Hard link     \(statistics.hardLinkDuplicates) doppioni, \(formatted(statistics.hardLinkDuplicateBytes)) non contati due volte")
-    log("Solo cloud    \(statistics.datalessFiles) file, \(statistics.datalessDirectories) cartelle, non scaricati")
-    log("Esclusi       \(statistics.excludedItems), altri volumi \(statistics.mountPoints)")
-    log("Non leggibili \(statistics.unreadableDirectories) cartelle")
-    log("Memoria       albero \(formatted(Int64(tree.storageBytes))), picco processo \(formatted(peakMemoryBytes()))")
+    log("Path          \(tree.path(of: tree.root))")
+    log("Allocated     \(formatted(sizes.allocated))  (\(sizes.allocated) bytes)")
+    log("Logical       \(formatted(sizes.logical))")
+    log("Private       \(formatted(sizes.privateBytes))")
+    log("Entries       \(tree.count) in \(String(format: "%.2f", elapsed)) s, \(Int(Double(tree.count) / max(elapsed, 0.001))) per second")
+    log("  files \(statistics.files), folders \(statistics.directories), symbolic links \(statistics.symlinks), other \(statistics.otherItems)")
+    log("Hard links    \(statistics.hardLinkDuplicates) extra links, \(formatted(statistics.hardLinkDuplicateBytes)) not counted twice")
+    log("Cloud only    \(statistics.datalessFiles) files, \(statistics.datalessDirectories) folders, not downloaded")
+    log("Excluded      \(statistics.excludedItems), other volumes \(statistics.mountPoints)")
+    log("Unreadable    \(statistics.unreadableDirectories) folders")
+    log("Memory        tree \(formatted(Int64(tree.storageBytes))), process peak \(formatted(peakMemoryBytes()))")
 
     if !statistics.errorCounts.isEmpty {
-        log("Errori")
+        log("Errors")
         for (code, count) in statistics.errorCounts.sorted(by: { $0.value > $1.value }) {
             log("  \(count) × \(String(cString: strerror(code))) (errno \(code))")
         }
         for sample in statistics.errorSamples.prefix(8) {
-            log("  es. \(sample.path): \(sample.message)")
+            log("  e.g. \(sample.path): \(sample.message)")
         }
     }
 }
 
 func printLargest(_ tree: FileTree, count: Int) {
     guard count > 0 else { return }
-    print("\nCartelle più grandi")
+    print("\nLargest folders")
     var frontier = [tree.root]
     var largest: [NodeID] = []
     // Opens the largest directory each time, so each line adds new information.
@@ -147,9 +147,9 @@ do {
     }
     printSummary(result)
 } catch ScanError.rootUnavailable(let path, let code) {
-    FileHandle.standardError.write(Data("errore: \(path): \(String(cString: strerror(code)))\n".utf8))
+    FileHandle.standardError.write(Data("error: \(path): \(String(cString: strerror(code)))\n".utf8))
     exit(1)
 } catch ScanError.rootNotDirectory(let path) {
-    FileHandle.standardError.write(Data("errore: \(path) non è una cartella\n".utf8))
+    FileHandle.standardError.write(Data("error: \(path) is not a folder\n".utf8))
     exit(1)
 }

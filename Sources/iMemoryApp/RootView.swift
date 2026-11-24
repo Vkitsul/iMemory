@@ -8,22 +8,22 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $model.section) {
-                Label("Panoramica", systemImage: "chart.pie").tag(AppModel.Section.overview)
-                Label("Esplora", systemImage: "square.grid.3x3.square").tag(AppModel.Section.explore)
-                Label("App", systemImage: "app.badge").tag(AppModel.Section.apps)
-                Label("File grandi", systemImage: "doc.badge.ellipsis").tag(AppModel.Section.files)
-                Label("Duplicati", systemImage: "doc.on.doc").tag(AppModel.Section.duplicates)
-                Label("Pulizia", systemImage: "sparkles").tag(AppModel.Section.cleanup)
-                Label("Sviluppatore", systemImage: "hammer").tag(AppModel.Section.developer)
-                Label("Cronologia", systemImage: "clock").tag(AppModel.Section.history)
-                Label("Automazione", systemImage: "gearshape.2").tag(AppModel.Section.automation)
+                Label("Overview", systemImage: "chart.pie").tag(AppModel.Section.overview)
+                Label("Explore", systemImage: "square.grid.3x3.square").tag(AppModel.Section.explore)
+                Label("Apps", systemImage: "app.badge").tag(AppModel.Section.apps)
+                Label("Large files", systemImage: "doc.badge.ellipsis").tag(AppModel.Section.files)
+                Label("Duplicates", systemImage: "doc.on.doc").tag(AppModel.Section.duplicates)
+                Label("Cleanup", systemImage: "sparkles").tag(AppModel.Section.cleanup)
+                Label("Developer", systemImage: "hammer").tag(AppModel.Section.developer)
+                Label("History", systemImage: "clock").tag(AppModel.Section.history)
+                Label("Automation", systemImage: "gearshape.2").tag(AppModel.Section.automation)
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
         } detail: {
             detail
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button("Scansiona di nuovo", systemImage: "arrow.clockwise") {
+                        Button("Scan again", systemImage: "arrow.clockwise") {
                             model.startScan()
                         }
                         .keyboardShortcut("r")
@@ -49,21 +49,21 @@ struct RootView: View {
         switch model.phase {
         case .idle:
             ContentUnavailableView {
-                Label("Nessuna scansione", systemImage: "internaldrive")
+                Label("No scan yet", systemImage: "internaldrive")
             } description: {
-                Text("Misura il disco per vedere dove finisce lo spazio. La scansione legge soltanto.")
+                Text("Measure the disk to see where the space goes. Scanning only reads.")
             } actions: {
-                Button("Scansiona") { model.startScan() }
+                Button("Scan") { model.startScan() }
             }
         case .scanning(let progress):
             ScanningView(progress: progress, isStalled: model.isScanStalled) { model.cancelScan() }
         case .failed(let message):
             ContentUnavailableView {
-                Label("La scansione non è riuscita", systemImage: "exclamationmark.triangle")
+                Label("The scan failed", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(message)
             } actions: {
-                Button("Riprova") { model.startScan() }
+                Button("Try again") { model.startScan() }
             }
         case .ready(let session):
             switch model.section {
@@ -110,18 +110,18 @@ private struct ScanningView: View {
         VStack(spacing: 14) {
             ProgressView()
                 .controlSize(.large)
-            Text("Scansione del disco")
+            Text("Scanning the disk")
                 .font(.title3)
-            Text("\(Format.count(progress.items)) voci, \(Format.bytes(progress.allocatedBytes))")
+            Text("\(Format.count(progress.items)) items, \(Format.bytes(progress.allocatedBytes))")
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             if isStalled {
-                Label("La scansione è ferma. macOS potrebbe aspettare una risposta a una richiesta di permesso: controlla se c'è un avviso aperto.", systemImage: "exclamationmark.triangle")
+                Label("The scan has stalled. macOS may be waiting for an answer to a permission request: check for an open alert.", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                     .frame(maxWidth: 420)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button("Annulla", action: cancel)
+            Button("Cancel", action: cancel)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

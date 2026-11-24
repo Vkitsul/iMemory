@@ -219,7 +219,7 @@ final class AppModel {
 
 /// Keeps the folder sizes of the last scan between launches.
 private enum SnapshotStore {
-    nonisolated private static let file = AppStorage.folder.appendingPathComponent("ultima-scansione.json")
+    nonisolated private static let file = AppStorage.folder.appendingPathComponent("last-scan.json")
 
     /// Saves `snapshot` and returns the one it replaces.
     nonisolated static func exchange(_ snapshot: ScanSnapshot) -> ScanSnapshot? {
