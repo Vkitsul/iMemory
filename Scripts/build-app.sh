@@ -1,5 +1,6 @@
 #!/bin/bash
 # Builds iMemory and creates build/iMemory.app. Prints the bundle's path.
+# With --install, it also replaces /Applications/iMemory.app.
 #
 # Signs with an "Apple Development" certificate if there is one, so that Full Disk
 # Access stays valid from one build to the next. Otherwise it signs ad hoc, and macOS
@@ -45,5 +46,17 @@ PLIST
 IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ { print $2; exit }')"
 codesign --force --sign "${IDENTITY:--}" "$APP" >&2
 echo "Signed with: ${IDENTITY:-ad hoc}" >&2
+
+if [ "${1:-}" = "--install" ]; then
+    # Replacing the bundle under a running app would leave it in an odd state.
+    if pgrep -x iMemory >/dev/null; then
+        echo "Quit iMemory before installing" >&2
+        exit 1
+    fi
+    rm -rf /Applications/iMemory.app
+    ditto "$APP" /Applications/iMemory.app
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/iMemory.app
+    echo "Installed in /Applications" >&2
+fi
 
 echo "$APP"

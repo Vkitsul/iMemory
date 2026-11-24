@@ -29,6 +29,12 @@ Scripts/build-app.sh
 open build/iMemory.app
 ```
 
+To also install it in `/Applications`, replacing any earlier copy:
+
+```bash
+Scripts/build-app.sh --install
+```
+
 For a complete scan, give iMemory Full Disk Access in System Settings, Privacy & Security. Without it the app still works, and tells you which folders it couldn't read.
 
 With ad hoc signing, macOS asks for the permission again after every build. Adding your Apple ID in Xcode gives you a free "Apple Development" certificate, which `build-app.sh` uses automatically.
