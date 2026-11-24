@@ -71,3 +71,7 @@ A personal project, published as is. Every feature is built and covered by autom
 | `Sources/iMemoryApp` | The SwiftUI app |
 | `Sources/imemory-scan` | Command-line scanner |
 | `Scripts` | Build, icon, and verification scripts |
+
+## License
+
+MIT. See [LICENSE](LICENSE).

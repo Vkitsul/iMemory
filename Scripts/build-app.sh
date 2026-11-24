@@ -32,7 +32,7 @@ cat >"$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
-    <key>NSHumanReadableCopyright</key><string>Personal project</string>
+    <key>NSHumanReadableCopyright</key><string>MIT License</string>
     <key>CFBundleShortVersionString</key><string>0.1</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>CFBundleDevelopmentRegion</key><string>en</string>
